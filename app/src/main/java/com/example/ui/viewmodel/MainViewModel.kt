@@ -25,6 +25,18 @@ enum class AppNavTab {
     TODAY, PLANS, PROGRESS, SETTINGS
 }
 
+enum class AppThemeMode(val id: String, val label: String) {
+    SYSTEM("system", "Zgodny z systemem"),
+    LIGHT("light", "Jasny"),
+    DARK("dark", "Ciemny");
+
+    companion object {
+        fun fromId(id: String?): AppThemeMode {
+            return entries.firstOrNull { it.id == id } ?: SYSTEM
+        }
+    }
+}
+
 data class ReaderSession(
     val bookCode: String,
     val chapter: Int,
@@ -33,7 +45,9 @@ data class ReaderSession(
     val isCompleted: Boolean,
     val hasNext: Boolean,
     val hasPrev: Boolean,
-    val source: BibleSource = BibleSource.PISMOSWIETE
+    val source: BibleSource = BibleSource.PISMOSWIETE,
+    val passageLabel: String = "$bookName, rozdz. $chapter",
+    val useNativeReader: Boolean = true
 )
 
 data class UiState(
@@ -48,7 +62,8 @@ data class UiState(
     val planProgressRatio: Float = 0f,
     val readerSession: ReaderSession? = null,
     val allCompletedReadings: List<ReadingProgressEntity> = emptyList(),
-    val selectedBibleSource: BibleSource = BibleSource.PISMOSWIETE
+    val selectedBibleSource: BibleSource = BibleSource.PISMOSWIETE,
+    val themeMode: AppThemeMode = AppThemeMode.SYSTEM
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -68,6 +83,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _readerSession = MutableStateFlow<ReaderSession?>(null)
     private val _selectedBibleSource = MutableStateFlow(
         BibleSource.fromId(sharedPrefs.getString("preferred_bible_source", BibleSource.PISMOSWIETE.id))
+    )
+    private val _themeMode = MutableStateFlow(
+        AppThemeMode.fromId(sharedPrefs.getString("app_theme_mode", AppThemeMode.SYSTEM.id))
     )
 
     val activePlanState: StateFlow<UserPlanStateEntity> = repository.activePlanState
@@ -95,13 +113,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         PlanData(userState, completedList, allCompleted)
     }
 
+    private data class ReaderPreferences(
+        val bibleSource: BibleSource,
+        val themeMode: AppThemeMode
+    )
+
+    private val readerPrefsFlow = combine(_selectedBibleSource, _themeMode) { source, mode ->
+        ReaderPreferences(source, mode)
+    }
+
     val uiState: StateFlow<UiState> = combine(
         _currentTab,
         _selectedDay,
         _readerSession,
-        _selectedBibleSource,
+        readerPrefsFlow,
         planDataFlow
-    ) { tab, selectedDay, readerSession, bibleSource, planData ->
+    ) { tab, selectedDay, readerSession, readerPrefs, planData ->
+        val bibleSource = readerPrefs.bibleSource
+        val themeMode = readerPrefs.themeMode
         val userState = planData.userState
         val completedList = planData.completedList
         val allCompleted = planData.allCompleted
@@ -141,7 +170,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             planProgressRatio = progressRatio,
             readerSession = updatedReader,
             allCompletedReadings = allCompleted,
-            selectedBibleSource = bibleSource
+            selectedBibleSource = bibleSource,
+            themeMode = themeMode
         )
     }.stateIn(
         viewModelScope,
@@ -201,6 +231,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val dayPlan = repository.getDayPlan(uiState.value.activePlan.id, dayNumber)
         val index = dayPlan.passages.indexOfFirst { it.bookCode == passage.bookCode && it.chapter == passage.chapter }
         val key = "$dayNumber-${passage.bookCode}-${passage.chapter}"
+        val useNative = sharedPrefs.getBoolean("pref_use_native_reader", true)
 
         _readerSession.value = ReaderSession(
             bookCode = passage.bookCode,
@@ -210,14 +241,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isCompleted = uiState.value.completedKeys.contains(key),
             hasNext = index >= 0 && index < dayPlan.passages.size - 1,
             hasPrev = index > 0,
-            source = _selectedBibleSource.value
+            source = _selectedBibleSource.value,
+            passageLabel = passage.passageLabel,
+            useNativeReader = useNative
         )
+    }
+
+    fun setReaderMode(native: Boolean) {
+        sharedPrefs.edit().putBoolean("pref_use_native_reader", native).apply()
+        _readerSession.value = _readerSession.value?.copy(useNativeReader = native)
     }
 
     fun setBibleSource(source: BibleSource) {
         _selectedBibleSource.value = source
         sharedPrefs.edit().putString("preferred_bible_source", source.id).apply()
         _readerSession.value = _readerSession.value?.copy(source = source)
+    }
+
+    fun setThemeMode(mode: AppThemeMode) {
+        _themeMode.value = mode
+        sharedPrefs.edit().putString("app_theme_mode", mode.id).apply()
+    }
+
+    fun toggleThemeMode() {
+        val next = when (_themeMode.value) {
+            AppThemeMode.DARK -> AppThemeMode.LIGHT
+            AppThemeMode.LIGHT -> AppThemeMode.DARK
+            AppThemeMode.SYSTEM -> AppThemeMode.DARK
+        }
+        setThemeMode(next)
     }
 
     fun closeReader() {

@@ -129,11 +129,21 @@ object BibleData {
             totalDays = 30,
             chaptersPerDay = "2 rozdziały dziennie",
             scopeTag = "Księgi Mądrościowe"
+        ),
+        PlanDefinition(
+            id = "plan_mateusz_wobi",
+            title = "Plan Jacka Święckiego (Mateusz.pl)",
+            subtitle = "Cała Biblia w 2 lata (104 tygodnie, Chemin Neuf)",
+            description = "Metoda wspólnoty Chemin Neuf z portalu mateusz.pl (WOBI): ok. 15 minut dziennie przez 6 dni w tygodniu w 4 zbalansowanych cyklach historyczno-teologicznych.",
+            totalDays = 624,
+            chaptersPerDay = "1–2 fragmenty (ok. 15 min)",
+            scopeTag = "Cała Biblia (2 lata)"
         )
     )
 
     fun generateDayPlan(planId: String, day: Int): DayPlan {
         return when (planId) {
+            "plan_mateusz_wobi" -> generateMateuszDay(day)
             "plan_nt_90" -> generateNt90Day(day)
             "plan_gospels_psalms_60" -> generateGospelsPsalms60Day(day)
             "plan_wisdom_30" -> generateWisdom30Day(day)
@@ -311,6 +321,28 @@ object BibleData {
         return DayPlan(
             dayNumber = day,
             title = "Dzień $day: ${w1.first} ${w1.second}, ${w2.first} ${w2.second}",
+            passages = passages
+        )
+    }
+
+    private fun generateMateuszDay(day: Int): DayPlan {
+        val count = MateuszPlanData.entries.size
+        val clampedDay = ((day - 1).coerceIn(0, count - 1))
+        val entry = MateuszPlanData.entries[clampedDay]
+
+        val passages = entry.passages.map { p ->
+            val book = getBook(p.bookCode)
+            ReadingPassage(
+                bookCode = p.bookCode,
+                bookName = book?.name ?: p.bookCode,
+                chapter = p.chapter,
+                passageLabel = p.label
+            )
+        }
+
+        return DayPlan(
+            dayNumber = day,
+            title = "Dzień $day (${entry.weekLabel}, dz. ${entry.dayOfWeek}): ${entry.rawText}",
             passages = passages
         )
     }

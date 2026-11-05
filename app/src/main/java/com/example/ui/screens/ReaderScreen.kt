@@ -36,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.NavigateBefore
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Add
@@ -54,6 +55,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -92,6 +94,8 @@ import com.example.model.ReadingPassage
 import com.example.ui.viewmodel.ReaderSession
 import kotlinx.coroutines.launch
 
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -100,9 +104,16 @@ import com.example.model.BibleSource
 private const val READER_PREFS = "reader_settings"
 private const val KEY_FONT_ZOOM = "font_zoom_percent"
 private const val DEFAULT_FONT_ZOOM = 130
-private val ReaderPaperColor = Color(0xFFFCFBF9)
+private val LightPaperColor = Color(0xFFFCFBF9)
+private val DarkPaperColor = Color(0xFF161311)
 
-private fun injectSafeReaderStyles(webView: WebView?) {
+private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
+    val bgColor = if (isDark) "#161311" else "#fcfbf9"
+    val textColor = if (isDark) "#ECE0DB" else "#212529"
+    val primaryColor = if (isDark) "#F3BD80" else "#1565c0"
+    val titleColor = if (isDark) "#D36868" else "#0d47a1"
+    val subtitleColor = if (isDark) "#9E8E89" else "#5f6368"
+
     val js = """
         (function() {
             try {
@@ -117,246 +128,303 @@ private fun injectSafeReaderStyles(webView: WebView?) {
 
                 // Add or update reader CSS without breaking layout
                 var styleId = 'biblia_reader_clean_style';
-                if (!document.getElementById(styleId)) {
-                    var style = document.createElement('style');
+                var style = document.getElementById(styleId);
+                if (!style) {
+                    style = document.createElement('style');
                     style.id = styleId;
                     style.type = 'text/css';
-                    style.innerHTML = `
-                        html, body {
-                            background-color: #fcfbf9 !important;
-                            background-image: none !important;
-                            color: #212529 !important;
-                            -webkit-text-size-adjust: 100% !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                        }
-
-                        /* ========================================================
-                           1. PISMOSWIETE.PL RULES
-                           ======================================================== */
-                        md-toolbar.toolbar,
-                        .toolbar,
-                        #toastContainer,
-                        .search-box,
-                        .search-area,
-                        .search-select-container,
-                        .bookmark-chapter,
-                        .preview-bottom-toolbar,
-                        .next-prev-button,
-                        #btn-prev-chapter-bottom,
-                        #btn-next-chapter-bottom,
-                        #btn-prev-chapter-top,
-                        #btn-next-chapter-top,
-                        md-tooltip,
-                        .md-tooltip,
-                        .md-tooltip-container,
-                        .preview .link,
-                        .preview .link.comment,
-                        .preview .link.definition,
-                        .preview .comment,
-                        .preview .comment-perykopa,
-                        .preview .comment-tome,
-                        .preview a.link,
-                        a.link.comment,
-                        a.link.definition,
-                        .fa-comments {
-                            display: none !important;
-                            height: 0 !important;
-                            min-height: 0 !important;
-                            max-height: 0 !important;
-                            visibility: hidden !important;
-                            opacity: 0 !important;
-                            pointer-events: none !important;
-                            overflow: hidden !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                        }
-                        #main-div, .chapter-view-content-anim {
-                            padding-top: 0 !important;
-                            margin-top: 0 !important;
-                        }
-                        .md-content {
-                            padding-top: 4px !important;
-                        }
-                        .preview.preview-with-left-margin {
-                            margin-left: 0 !important;
-                        }
-                        .preview {
-                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-                            font-size: 1.12rem !important;
-                            line-height: 1.8 !important;
-                            color: #212529 !important;
-                            max-width: 780px !important;
-                            margin: 0 auto !important;
-                            padding: 12px 16px 80px 16px !important;
-                            box-sizing: border-box !important;
-                        }
-                        @media (max-width: 600px) {
-                            .preview {
-                                padding: 8px 12px 60px 12px !important;
-                                font-size: 1.08rem !important;
-                                line-height: 1.75 !important;
-                            }
-                        }
-                        .preview .chapter-number {
-                            font-size: 2em !important;
-                            font-weight: bold !important;
-                            color: #1565c0 !important;
-                            float: left !important;
-                            margin: 2px 6px 0 0 !important;
-                        }
-                        .preview .werset-number, .preview sup {
-                            color: #1565c0 !important;
-                            font-weight: bold !important;
-                            font-size: 0.8em !important;
-                        }
-                        .preview .perykopa {
-                            font-size: 1.15em !important;
-                            font-weight: bold !important;
-                            color: #0d47a1 !important;
-                            margin: 16px 0 6px !important;
-                        }
-
-                        /* ========================================================
-                           2. BIBLIA.DEON.PL RULES
-                           ======================================================== */
-                        .header,
-                        .footer,
-                        .sculpture,
-                        .border-top,
-                        .border-bottom,
-                        .nav,
-                        .mobile-nav-wrapper,
-                        .mobile-nav,
-                        .chapter-nav,
-                        .border-nav,
-                        .ad-content,
-                        .bottom-navi,
-                        div#chapter-buttons,
-                        div.title,
-                        .footer-nav,
-                        #switch-chapter-nav,
-                        .blue-dot-line,
-                        #img-pallottinum,
-                        #pismo-swiete,
-                        #starego-i-nowego,
-                        a.przypis,
-                        sup a.przypis,
-                        .footnotes,
-                        .footnotes-content,
-                        div.menu,
-                        div.submenu,
-                        #top_search,
-                        .search,
-                        .reklama,
-                        .social-share,
-                        .fb-like,
-                        #cookie-law,
-                        .cookie-info,
-                        .cookie {
-                            display: none !important;
-                            height: 0 !important;
-                            min-height: 0 !important;
-                            max-height: 0 !important;
-                            visibility: hidden !important;
-                            opacity: 0 !important;
-                            pointer-events: none !important;
-                            overflow: hidden !important;
-                            margin: 0 !important;
-                            padding: 0 !important;
-                        }
-
-                        .wrap, .the-content, .tresc, #content, .main {
-                            background-color: #fcfbf9 !important;
-                            background-image: none !important;
-                            max-width: 780px !important;
-                            margin: 0 auto !important;
-                            padding: 12px 16px 80px 16px !important;
-                            box-sizing: border-box !important;
-                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
-                            font-size: 1.12rem !important;
-                            line-height: 1.8 !important;
-                            color: #212529 !important;
-                            width: 100% !important;
-                        }
-
-                        @media (max-width: 600px) {
-                            .wrap, .the-content, .tresc, #content {
-                                padding: 8px 14px 60px 14px !important;
-                                font-size: 1.08rem !important;
-                                line-height: 1.75 !important;
-                            }
-                        }
-
-                        .testament-label {
-                            font-size: 0.85rem !important;
-                            text-transform: uppercase !important;
-                            color: #5f6368 !important;
-                            letter-spacing: 1.5px !important;
-                            text-align: center !important;
-                            margin: 8px 0 4px !important;
-                            display: block !important;
-                        }
-
-                        .book-label {
-                            font-size: 1.45rem !important;
-                            font-weight: bold !important;
-                            color: #0d47a1 !important;
-                            text-align: center !important;
-                            margin: 4px 0 16px !important;
-                            display: block !important;
-                        }
-
-                        .tytul1, .miedzytytul1, .tytul2 {
-                            font-size: 1.18rem !important;
-                            font-weight: bold !important;
-                            color: #1565c0 !important;
-                            margin: 20px 0 8px !important;
-                            display: block !important;
-                        }
-
-                        .initial-letter {
-                            font-size: 2.2rem !important;
-                            font-weight: bold !important;
-                            color: #0d47a1 !important;
-                            float: left !important;
-                            line-height: 1 !important;
-                            margin: 2px 8px 0 0 !important;
-                        }
-
-                        .werset, span.werset {
-                            color: #1565c0 !important;
-                            font-weight: bold !important;
-                            font-size: 0.85em !important;
-                            margin-right: 4px !important;
-                            display: inline !important;
-                        }
-
-                        sup {
-                            color: #1565c0 !important;
-                            font-size: 0.75em !important;
-                        }
-                    `;
                     if (document.head) document.head.appendChild(style);
                 }
+                style.innerHTML = `
+                    html, body {
+                        background-color: $bgColor !important;
+                        background-image: none !important;
+                        color: $textColor !important;
+                        -webkit-text-size-adjust: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
 
-                // Directly hide any toolbar, navigation buttons, tooltips, and comment speech bubbles already rendered in the DOM
-                var elementsToHide = document.querySelectorAll(
-                    '.toolbar, md-toolbar, #toastContainer, .search-box, .search-area, .bookmark-chapter, ' +
-                    '.preview-bottom-toolbar, .next-prev-button, #btn-prev-chapter-bottom, #btn-next-chapter-bottom, ' +
-                    '#btn-prev-chapter-top, #btn-next-chapter-top, md-tooltip, .md-tooltip, .md-tooltip-container, ' +
-                    '.preview .link, .preview .comment, a.link, a.link.comment, a.link.definition, .fa-comments, ' +
-                    '.header, .footer, .sculpture, .nav, .mobile-nav-wrapper, .mobile-nav, .chapter-nav, ' +
-                    '.ad-content, .bottom-navi, div#chapter-buttons, div.title, .footer-nav, #switch-chapter-nav, ' +
-                    '.blue-dot-line, #img-pallottinum, #pismo-swiete, #starego-i-nowego, a.przypis, sup a.przypis, ' +
-                    '.footnotes, .footnotes-content, .reklama, .cookie, #cookie-law, .social-share, .fb-like'
-                );
-                for (var i = 0; i < elementsToHide.length; i++) {
-                    elementsToHide[i].style.setProperty('display', 'none', 'important');
-                    elementsToHide[i].style.setProperty('height', '0px', 'important');
-                    elementsToHide[i].style.setProperty('visibility', 'hidden', 'important');
-                    elementsToHide[i].style.setProperty('opacity', '0', 'important');
-                    elementsToHide[i].style.setProperty('pointer-events', 'none', 'important');
+                    /* ========================================================
+                       1. PISMOSWIETE.PL RULES
+                       ======================================================== */
+                    md-toolbar.toolbar,
+                    .toolbar,
+                    #toastContainer,
+                    .search-box,
+                    .search-area,
+                    .search-select-container,
+                    .bookmark-chapter,
+                    .preview-bottom-toolbar,
+                    [class*="bottom-toolbar"],
+                    .next-prev-button,
+                    #btn-prev-chapter-bottom,
+                    #btn-next-chapter-bottom,
+                    #btn-prev-chapter-top,
+                    #btn-next-chapter-top,
+                    [aria-label*="Poprzedni rozdział"],
+                    [aria-label*="Następny rozdział"],
+                    [aria-label*="poprzedni"],
+                    [aria-label*="następny"],
+                    md-tooltip,
+                    .md-tooltip,
+                    .md-tooltip-container,
+                    .md-tooltip-grow,
+                    [role="tooltip"],
+                    md-backdrop,
+                    .md-scroll-mask,
+                    md-sidenav,
+                    .preview .link,
+                    .preview .link.comment,
+                    .preview .link.definition,
+                    .preview .link.note,
+                    .preview .link.dictionary,
+                    .preview .link.bookmark,
+                    .preview .comment,
+                    .preview .comment-perykopa,
+                    .preview .comment-tome,
+                    .preview a.link,
+                    a.link.comment,
+                    a.link.definition,
+                    .links,
+                    .fa-comments,
+                    .fa.fa-comments {
+                        display: none !important;
+                        height: 0 !important;
+                        min-height: 0 !important;
+                        max-height: 0 !important;
+                        visibility: hidden !important;
+                        opacity: 0 !important;
+                        pointer-events: none !important;
+                        overflow: hidden !important;
+                        position: absolute !important;
+                        left: -9999px !important;
+                        top: -9999px !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+                    #main-div, .chapter-view-content-anim {
+                        padding-top: 0 !important;
+                        margin-top: 0 !important;
+                        background-color: $bgColor !important;
+                    }
+                    .md-content {
+                        padding-top: 4px !important;
+                        background-color: $bgColor !important;
+                    }
+                    .preview.preview-with-left-margin {
+                        margin-left: 0 !important;
+                    }
+                    .preview {
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+                        font-size: 1.12rem !important;
+                        line-height: 1.8 !important;
+                        color: $textColor !important;
+                        background-color: $bgColor !important;
+                        max-width: 780px !important;
+                        margin: 0 auto !important;
+                        padding: 12px 16px 80px 16px !important;
+                        box-sizing: border-box !important;
+                    }
+                    @media (max-width: 600px) {
+                        .preview {
+                            padding: 8px 12px 60px 12px !important;
+                            font-size: 1.08rem !important;
+                            line-height: 1.75 !important;
+                        }
+                    }
+                    .preview .chapter-number {
+                        font-size: 2em !important;
+                        font-weight: bold !important;
+                        color: $primaryColor !important;
+                        float: left !important;
+                        margin: 2px 6px 0 0 !important;
+                    }
+                    .preview .werset-number, .preview sup {
+                        color: $primaryColor !important;
+                        font-weight: bold !important;
+                        font-size: 0.8em !important;
+                    }
+                    .preview .perykopa {
+                        font-size: 1.15em !important;
+                        font-weight: bold !important;
+                        color: $titleColor !important;
+                        margin: 16px 0 6px !important;
+                    }
+
+                    /* ========================================================
+                       2. BIBLIA.DEON.PL RULES
+                       ======================================================== */
+                    .header,
+                    .footer,
+                    .sculpture,
+                    .border-top,
+                    .border-bottom,
+                    .nav,
+                    .mobile-nav-wrapper,
+                    .mobile-nav,
+                    .chapter-nav,
+                    .border-nav,
+                    .ad-content,
+                    .bottom-navi,
+                    [class*="bottom-navi"],
+                    div#chapter-buttons,
+                    div.title,
+                    .footer-nav,
+                    #switch-chapter-nav,
+                    #right-button,
+                    #left-button,
+                    a[title="następny"],
+                    a[title="poprzedni"],
+                    .blue-dot-line,
+                    #img-pallottinum,
+                    #pismo-swiete,
+                    #starego-i-nowego,
+                    a.przypis,
+                    sup a.przypis,
+                    .footnotes,
+                    .footnotes-content,
+                    div.menu,
+                    div.submenu,
+                    #top_search,
+                    .search,
+                    .reklama,
+                    .social-share,
+                    .fb-like,
+                    #cookie-law,
+                    .cookie-info,
+                    .cookie {
+                        display: none !important;
+                        height: 0 !important;
+                        min-height: 0 !important;
+                        max-height: 0 !important;
+                        visibility: hidden !important;
+                        opacity: 0 !important;
+                        pointer-events: none !important;
+                        overflow: hidden !important;
+                        position: absolute !important;
+                        left: -9999px !important;
+                        top: -9999px !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+
+                    .wrap, .the-content, .tresc, #content, .main {
+                        background-color: $bgColor !important;
+                        background-image: none !important;
+                        max-width: 780px !important;
+                        margin: 0 auto !important;
+                        padding: 12px 16px 80px 16px !important;
+                        box-sizing: border-box !important;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+                        font-size: 1.12rem !important;
+                        line-height: 1.8 !important;
+                        color: $textColor !important;
+                        width: 100% !important;
+                    }
+
+                    @media (max-width: 600px) {
+                        .wrap, .the-content, .tresc, #content {
+                            padding: 8px 14px 60px 14px !important;
+                            font-size: 1.08rem !important;
+                            line-height: 1.75 !important;
+                        }
+                    }
+
+                    .testament-label {
+                        font-size: 0.85rem !important;
+                        text-transform: uppercase !important;
+                        color: $subtitleColor !important;
+                        letter-spacing: 1.5px !important;
+                        text-align: center !important;
+                        margin: 8px 0 4px !important;
+                        display: block !important;
+                    }
+
+                    .book-label {
+                        font-size: 1.45rem !important;
+                        font-weight: bold !important;
+                        color: $titleColor !important;
+                        text-align: center !important;
+                        margin: 4px 0 16px !important;
+                        display: block !important;
+                    }
+
+                    .tytul1, .miedzytytul1, .tytul2 {
+                        font-size: 1.18rem !important;
+                        font-weight: bold !important;
+                        color: $titleColor !important;
+                        margin: 20px 0 8px !important;
+                        display: block !important;
+                    }
+
+                    .initial-letter {
+                        font-size: 2.2rem !important;
+                        font-weight: bold !important;
+                        color: $primaryColor !important;
+                        float: left !important;
+                        line-height: 1 !important;
+                        margin: 2px 8px 0 0 !important;
+                    }
+
+                    .werset, span.werset {
+                        color: $primaryColor !important;
+                        font-weight: bold !important;
+                        font-size: 0.85em !important;
+                        margin-right: 4px !important;
+                        display: inline !important;
+                    }
+
+                    sup {
+                        color: $primaryColor !important;
+                        font-size: 0.75em !important;
+                    }
+                `;
+
+                // Apply direct inline styles to body
+                document.body.style.backgroundColor = '$bgColor';
+                document.body.style.color = '$textColor';
+
+                // Function to permanently purge unwanted elements from the DOM
+                function purgeOffendingElements() {
+                    var selectors = [
+                        'md-tooltip', '.md-tooltip', '.md-tooltip-container', '.md-tooltip-grow', '[role="tooltip"]',
+                        '#toastContainer', '.preview-bottom-toolbar', '[class*="bottom-toolbar"]', '.next-prev-button',
+                        '#btn-prev-chapter-bottom', '#btn-next-chapter-bottom',
+                        '#btn-prev-chapter-top', '#btn-next-chapter-top',
+                        'md-toolbar', '.toolbar', 'md-sidenav', '.md-scroll-mask',
+                        '.preview .link', '.preview .comment', 'a.link', '.fa-comments', '.links',
+                        '.header', '.footer', '.sculpture', '.nav', '.mobile-nav-wrapper', '.mobile-nav',
+                        '.chapter-nav', '.ad-content', '.bottom-navi', '[class*="bottom-navi"]', 'div#chapter-buttons',
+                        '#right-button', '#left-button', 'a[title="następny"]', 'a[title="poprzedni"]',
+                        '.footer-nav', '#switch-chapter-nav', '.blue-dot-line', '#img-pallottinum',
+                        '#pismo-swiete', '#starego-i-nowego', 'a.przypis', 'sup a.przypis',
+                        '.footnotes', '.footnotes-content', '.reklama', '.cookie', '#cookie-law'
+                    ];
+                    for (var s = 0; s < selectors.length; s++) {
+                        var els = document.querySelectorAll(selectors[s]);
+                        for (var i = 0; i < els.length; i++) {
+                            if (els[i] && els[i].parentNode) {
+                                els[i].parentNode.removeChild(els[i]);
+                            }
+                        }
+                    }
+                }
+
+                purgeOffendingElements();
+
+                // Install observer once to continually purge asynchronous SPA additions
+                if (!window._mannaObserverInstalled) {
+                    window._mannaObserverInstalled = true;
+                    try {
+                        var obs = new MutationObserver(function() {
+                            purgeOffendingElements();
+                        });
+                        obs.observe(document.documentElement || document.body, { childList: true, subtree: true });
+                        setInterval(purgeOffendingElements, 500);
+                    } catch (e) {
+                        console.error("Observer init error: " + e);
+                    }
                 }
             } catch (e) {
                 console.error("Reader styling error: " + e);
@@ -376,6 +444,9 @@ fun ReaderScreen(
     onNextChapter: () -> Unit,
     onPrevChapter: () -> Unit,
     onSetBibleSource: (BibleSource) -> Unit = {},
+    onSwitchToNativeReader: () -> Unit = {},
+    isDarkTheme: Boolean = false,
+    onToggleTheme: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -505,6 +576,30 @@ fun ReaderScreen(
                     }
                 }
 
+                // Theme mode toggle button (Day / Night)
+                IconButton(
+                    onClick = onToggleTheme,
+                    modifier = Modifier.testTag("reader_theme_toggle_button")
+                ) {
+                    Icon(
+                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = if (isDarkTheme) "Włącz tryb jasny" else "Włącz tryb nocny",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Switch to Native Pericope Reader
+                IconButton(
+                    onClick = onSwitchToNativeReader,
+                    modifier = Modifier.testTag("reader_switch_native_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = "Przełącz na natywny czytnik perykop",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
                 // Font scaling button
                 IconButton(
                     onClick = { showFontSizeSheet = true },
@@ -559,12 +654,15 @@ fun ReaderScreen(
             )
         }
 
+        val currentPaperColor = if (isDarkTheme) DarkPaperColor else LightPaperColor
+        val webBgHex = if (isDarkTheme) "#161311" else "#FCFBF9"
+
         // Main Reader Container
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(ReaderPaperColor)
+                .background(currentPaperColor)
         ) {
             AndroidView(
                 factory = { ctx ->
@@ -573,8 +671,8 @@ fun ReaderScreen(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
-                        // Explicit paper background prevents black screen in Dark Theme
-                        setBackgroundColor(android.graphics.Color.parseColor("#FCFBF9"))
+                        // Paper background matches current theme (dark/light)
+                        setBackgroundColor(android.graphics.Color.parseColor(webBgHex))
 
                         // Enable cookies
                         CookieManager.getInstance().setAcceptCookie(true)
@@ -606,7 +704,7 @@ fun ReaderScreen(
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 webProgress = newProgress / 100f
                                 if (newProgress >= 70) {
-                                    injectSafeReaderStyles(view)
+                                    injectSafeReaderStyles(view, isDarkTheme)
                                 }
                                 if (newProgress >= 100) {
                                     isLoading = false
@@ -622,9 +720,9 @@ fun ReaderScreen(
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 isLoading = false
-                                injectSafeReaderStyles(view)
-                                view?.postDelayed({ injectSafeReaderStyles(view) }, 300)
-                                view?.postDelayed({ injectSafeReaderStyles(view) }, 800)
+                                injectSafeReaderStyles(view, isDarkTheme)
+                                view?.postDelayed({ injectSafeReaderStyles(view, isDarkTheme) }, 300)
+                                view?.postDelayed({ injectSafeReaderStyles(view, isDarkTheme) }, 800)
                             }
 
                             override fun onReceivedError(
@@ -650,6 +748,9 @@ fun ReaderScreen(
                         webView.settings.textZoom = fontZoom
                     }
 
+                    // Dynamically update background color when theme switches
+                    webView.setBackgroundColor(android.graphics.Color.parseColor(webBgHex))
+
                     // Only loadUrl if the requested passage URL actually changed (prevents reload loop)
                     if (currentUrl != lastLoadedUrl) {
                         lastLoadedUrl = currentUrl
@@ -657,7 +758,7 @@ fun ReaderScreen(
                         hasError = false
                         webView.loadUrl(currentUrl)
                     } else {
-                        injectSafeReaderStyles(webView)
+                        injectSafeReaderStyles(webView, isDarkTheme)
                     }
                 },
                 modifier = Modifier.fillMaxSize()
@@ -668,7 +769,7 @@ fun ReaderScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(ReaderPaperColor.copy(alpha = 0.85f)),
+                        .background(currentPaperColor.copy(alpha = 0.88f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -684,7 +785,7 @@ fun ReaderScreen(
                             text = "Ładowanie: ${session.bookName} ${session.chapter}",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF37474F)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
@@ -744,8 +845,8 @@ fun ReaderScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Previous Chapter Button (always fixed 48x48dp, never squeezed)
-                OutlinedIconButton(
+                // Previous Chapter Button (always fixed 48x48dp, solid tonal style)
+                FilledTonalIconButton(
                     onClick = onPrevChapter,
                     enabled = session.hasPrev,
                     modifier = Modifier
@@ -791,8 +892,8 @@ fun ReaderScreen(
                     )
                 }
 
-                // Next Chapter Button (always fixed 48x48dp, never squeezed)
-                OutlinedIconButton(
+                // Next Chapter Button (always fixed 48x48dp, solid tonal style)
+                FilledTonalIconButton(
                     onClick = onNextChapter,
                     enabled = session.hasNext,
                     modifier = Modifier

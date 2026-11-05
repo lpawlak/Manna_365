@@ -1,6 +1,6 @@
 {
-  "name": "Słowo na Dzień",
-  "description": "Codzienna lektura Pisma Świętego według wybranego planu czytania z integracją pismoswiete.pl, statystykami i przypomnieniami.",
+  "name": "Manna 365",
+  "description": "Codzienna lektura Pisma Świętego według wybranego planu czytania z integracją pismoswiete.pl oraz biblia.deon.pl, statystykami i przypomnieniami.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

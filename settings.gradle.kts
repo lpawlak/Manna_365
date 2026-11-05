@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "SlowoNaDzien"
+rootProject.name = "Manna 365"
 
 include(":app")

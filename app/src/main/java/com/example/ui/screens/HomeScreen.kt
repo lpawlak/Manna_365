@@ -353,7 +353,11 @@ fun HomeScreen(
                             textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None
                         )
                         Text(
-                            text = "Rozdział ${passage.chapter}",
+                            text = if (passage.passageLabel.isNotBlank() && !passage.passageLabel.contains("rozdz.")) {
+                                passage.passageLabel
+                            } else {
+                                "Rozdział ${passage.chapter}"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.BibleBottomNavBar
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.NativePericopeReader
 import com.example.ui.screens.PlansScreen
 import com.example.ui.screens.ProgressScreen
 import com.example.ui.screens.ReaderScreen
@@ -36,14 +37,15 @@ import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.AppNavTab
 import com.example.ui.viewmodel.MainViewModel
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.ui.viewmodel.AppThemeMode
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
-                BibleApp()
-            }
+            BibleApp()
         }
     }
 }
@@ -54,26 +56,50 @@ fun BibleApp(
     viewModel: MainViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    // Handle back button on sub-tabs
-    if (uiState.readerSession == null && uiState.currentTab != AppNavTab.TODAY) {
-        BackHandler {
-            viewModel.selectTab(AppNavTab.TODAY)
-        }
+    val isSystemDark = isSystemInDarkTheme()
+    val isDarkTheme = when (uiState.themeMode) {
+        AppThemeMode.SYSTEM -> isSystemDark
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
     }
 
-    // Fullscreen in-app reader takes precedence when a chapter is open
-    val currentReader = uiState.readerSession
-    if (currentReader != null) {
-        ReaderScreen(
-            session = currentReader,
-            onClose = { viewModel.closeReader() },
-            onToggleCompleted = { viewModel.toggleCurrentReaderPassage() },
-            onNextChapter = { viewModel.nextChapterInReader() },
-            onPrevChapter = { viewModel.prevChapterInReader() },
-            onSetBibleSource = { viewModel.setBibleSource(it) }
-        )
-    } else {
+    MyApplicationTheme(darkTheme = isDarkTheme) {
+        // Handle back button on sub-tabs
+        if (uiState.readerSession == null && uiState.currentTab != AppNavTab.TODAY) {
+            BackHandler {
+                viewModel.selectTab(AppNavTab.TODAY)
+            }
+        }
+
+        // Fullscreen in-app reader takes precedence when a chapter is open
+        val currentReader = uiState.readerSession
+        if (currentReader != null) {
+            if (currentReader.useNativeReader) {
+                NativePericopeReader(
+                    session = currentReader,
+                    onClose = { viewModel.closeReader() },
+                    onToggleCompleted = { viewModel.toggleCurrentReaderPassage() },
+                    onNextPassage = { viewModel.nextChapterInReader() },
+                    onPrevPassage = { viewModel.prevChapterInReader() },
+                    onSetBibleSource = { viewModel.setBibleSource(it) },
+                    onSwitchToWebView = { viewModel.setReaderMode(native = false) },
+                    isDarkTheme = isDarkTheme,
+                    onToggleTheme = { viewModel.toggleThemeMode() }
+                )
+            } else {
+                ReaderScreen(
+                    session = currentReader,
+                    onClose = { viewModel.closeReader() },
+                    onToggleCompleted = { viewModel.toggleCurrentReaderPassage() },
+                    onNextChapter = { viewModel.nextChapterInReader() },
+                    onPrevChapter = { viewModel.prevChapterInReader() },
+                    onSetBibleSource = { viewModel.setBibleSource(it) },
+                    onSwitchToNativeReader = { viewModel.setReaderMode(native = true) },
+                    isDarkTheme = isDarkTheme,
+                    onToggleTheme = { viewModel.toggleThemeMode() }
+                )
+            }
+        } else {
         Scaffold(
             modifier = Modifier
                 .fillMaxSize()
@@ -82,7 +108,7 @@ fun BibleApp(
                 TopAppBar(
                     title = {
                         Text(
-                            text = "Słowo na Dzień",
+                            text = "Manna 365",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -147,7 +173,8 @@ fun BibleApp(
                                 uiState = uiState,
                                 onUpdateReminder = { enabled, h, m -> viewModel.updateReminder(enabled, h, m) },
                                 onResetPlan = { viewModel.resetPlan() },
-                                onSetBibleSource = { viewModel.setBibleSource(it) }
+                                onSetBibleSource = { viewModel.setBibleSource(it) },
+                                onSetThemeMode = { viewModel.setThemeMode(it) }
                             )
                         }
                     }
@@ -155,4 +182,5 @@ fun BibleApp(
             }
         }
     }
+}
 }

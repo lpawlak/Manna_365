@@ -64,9 +64,14 @@ import com.example.ui.viewmodel.UiState
 import androidx.compose.ui.unit.sp
 
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.outlined.Circle
 import com.example.model.BibleSource
+import com.example.ui.viewmodel.AppThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -75,6 +80,7 @@ fun SettingsScreen(
     onUpdateReminder: (Boolean, Int, Int) -> Unit,
     onResetPlan: () -> Unit,
     onSetBibleSource: (BibleSource) -> Unit = {},
+    onSetThemeMode: (AppThemeMode) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -210,6 +216,121 @@ fun SettingsScreen(
                                 Icon(imageVector = Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Zmień")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // App Theme Mode Card (System / Light / Dark)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("app_theme_settings_card"),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Motyw aplikacji",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Wybierz tryb jasny, nocny (ciemny) lub automatyczny",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        val themeOptions = listOf(
+                            Triple(
+                                AppThemeMode.SYSTEM,
+                                "Zgodny z systemem",
+                                "Dostosowuje się automatycznie do ustawień urządzenia"
+                            ),
+                            Triple(
+                                AppThemeMode.LIGHT,
+                                "Jasny (Dzień)",
+                                "Jasne tło i wysoki kontrast w ciągu dnia"
+                            ),
+                            Triple(
+                                AppThemeMode.DARK,
+                                "Ciemny (Noc)",
+                                "Ciemne, ciepłe tło łagodne dla oczu w nocy"
+                            )
+                        )
+
+                        themeOptions.forEach { (mode, title, desc) ->
+                            val isSelected = uiState.themeMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                        shape = RoundedCornerShape(12.dp)
+                                    ),
+                                onClick = { onSetThemeMode(mode) }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = when (mode) {
+                                            AppThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+                                            AppThemeMode.LIGHT -> Icons.Default.LightMode
+                                            AppThemeMode.DARK -> Icons.Default.DarkMode
+                                        },
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = desc,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                                        contentDescription = if (isSelected) "Wybrany motyw" else null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -536,7 +657,7 @@ fun SettingsScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Słowo na Dzień • Wersja ${com.example.BuildConfig.VERSION_NAME}",
+                    text = "Manna 365 • Wersja ${com.example.BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -120,7 +120,11 @@ fun NativePericopeReader(
     onSwitchToWebView: () -> Unit,
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onNextPassageAndMarkCompleted: () -> Unit = {
+        if (!session.isCompleted) onToggleCompleted()
+        onNextPassage()
+    }
 ) {
     val context = LocalContext.current
     BackHandler { onClose() }
@@ -193,8 +197,13 @@ fun NativePericopeReader(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    val daySubtitle = if (session.totalPassages > 1) {
+                        "${session.source.shortLabel} • Dzień ${session.dayNumber} (fragment ${session.passageIndex + 1} z ${session.totalPassages})"
+                    } else {
+                        "${session.source.shortLabel} • Dzień ${session.dayNumber}"
+                    }
                     Text(
-                        text = "${session.source.shortLabel} • Dzień ${session.dayNumber}",
+                        text = daySubtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -490,17 +499,68 @@ fun NativePericopeReader(
 
                         item {
                             Spacer(modifier = Modifier.height(28.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(bottom = 14.dp)
-                            ) {
-                                Text(
-                                    text = "Koniec fragmentu na dziś",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                                )
+
+                            if (session.totalPassages > 1) {
+                                if (session.hasNext) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(bottom = 12.dp)
+                                    ) {
+                                        Text(
+                                            text = "Koniec fragmentu ${session.passageIndex + 1} z ${session.totalPassages} na dziś",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                        )
+                                    }
+
+                                    val nextLabel = session.nextPassageLabel ?: "kolejnego fragmentu"
+                                    FilledTonalButton(
+                                        onClick = onNextPassageAndMarkCompleted,
+                                        modifier = Modifier
+                                            .padding(bottom = 14.dp)
+                                            .testTag("reader_next_fragment_button")
+                                    ) {
+                                        Text(
+                                            text = "Kolejny fragment na dziś: $nextLabel",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.NavigateNext,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                } else {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.padding(bottom = 14.dp)
+                                    ) {
+                                        Text(
+                                            text = "Koniec wszystkich fragmentów na dziś (${session.totalPassages} z ${session.totalPassages})",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.padding(bottom = 14.dp)
+                                ) {
+                                    Text(
+                                        text = "Koniec fragmentu na dziś",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                    )
+                                }
                             }
 
                             // Podlinkowana małą czcionką informacja o źródle tekstu

@@ -455,7 +455,7 @@ fun HomeScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Kontynuuj: ${firstUnreadPassage.bookCode} ${firstUnreadPassage.chapter}",
+                        text = "Kontynuuj: ${if (firstUnreadPassage.passageLabel.isNotBlank()) firstUnreadPassage.passageLabel else "${firstUnreadPassage.bookCode} ${firstUnreadPassage.chapter}"}",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )

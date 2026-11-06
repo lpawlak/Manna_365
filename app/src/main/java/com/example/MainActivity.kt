@@ -80,6 +80,7 @@ fun BibleApp(
                     onClose = { viewModel.closeReader() },
                     onToggleCompleted = { viewModel.toggleCurrentReaderPassage() },
                     onNextPassage = { viewModel.nextChapterInReader() },
+                    onNextPassageAndMarkCompleted = { viewModel.markCurrentReaderPassageCompletedAndNext() },
                     onPrevPassage = { viewModel.prevChapterInReader() },
                     onSetBibleSource = { viewModel.setBibleSource(it) },
                     onSwitchToWebView = { viewModel.setReaderMode(native = false) },

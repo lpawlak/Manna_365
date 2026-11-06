@@ -47,7 +47,10 @@ data class ReaderSession(
     val hasPrev: Boolean,
     val source: BibleSource = BibleSource.PISMOSWIETE,
     val passageLabel: String = "$bookName, rozdz. $chapter",
-    val useNativeReader: Boolean = true
+    val useNativeReader: Boolean = true,
+    val passageIndex: Int = 0,
+    val totalPassages: Int = 1,
+    val nextPassageLabel: String? = null
 )
 
 data class UiState(
@@ -229,7 +232,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openReader(passage: ReadingPassage, dayNumber: Int) {
         val dayPlan = repository.getDayPlan(uiState.value.activePlan.id, dayNumber)
-        val index = dayPlan.passages.indexOfFirst { it.bookCode == passage.bookCode && it.chapter == passage.chapter }
+        val totalPassages = dayPlan.passages.size.coerceAtLeast(1)
+        val matchedIndex = dayPlan.passages.indexOfFirst {
+            it == passage || (it.bookCode == passage.bookCode && it.chapter == passage.chapter && it.passageLabel == passage.passageLabel)
+        }
+        val index = if (matchedIndex >= 0) {
+            matchedIndex
+        } else {
+            dayPlan.passages.indexOfFirst { it.bookCode == passage.bookCode && it.chapter == passage.chapter }.let { if (it >= 0) it else 0 }
+        }
+        val hasNext = index < totalPassages - 1
+        val hasPrev = index > 0
+        val nextPassage = if (hasNext) dayPlan.passages.getOrNull(index + 1) else null
+        val nextLabel = nextPassage?.passageLabel?.ifBlank { null } ?: nextPassage?.let { "${it.bookName} ${it.chapter}" }
+
         val key = "$dayNumber-${passage.bookCode}-${passage.chapter}"
         val useNative = sharedPrefs.getBoolean("pref_use_native_reader", true)
 
@@ -239,11 +255,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             bookName = passage.bookName,
             dayNumber = dayNumber,
             isCompleted = uiState.value.completedKeys.contains(key),
-            hasNext = index >= 0 && index < dayPlan.passages.size - 1,
-            hasPrev = index > 0,
+            hasNext = hasNext,
+            hasPrev = hasPrev,
             source = _selectedBibleSource.value,
-            passageLabel = passage.passageLabel,
-            useNativeReader = useNative
+            passageLabel = passage.passageLabel.ifBlank { "${passage.bookName}, rozdz. ${passage.chapter}" },
+            useNativeReader = useNative,
+            passageIndex = index,
+            totalPassages = totalPassages,
+            nextPassageLabel = nextLabel
         )
     }
 
@@ -279,7 +298,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun nextChapterInReader() {
         val current = _readerSession.value ?: return
         val dayPlan = repository.getDayPlan(uiState.value.activePlan.id, current.dayNumber)
-        val index = dayPlan.passages.indexOfFirst { it.bookCode == current.bookCode && it.chapter == current.chapter }
+        val matchedIndex = dayPlan.passages.indexOfFirst {
+            it.bookCode == current.bookCode && it.chapter == current.chapter && it.passageLabel == current.passageLabel
+        }
+        val index = if (matchedIndex >= 0) matchedIndex else current.passageIndex
         if (index >= 0 && index < dayPlan.passages.size - 1) {
             val nextPassage = dayPlan.passages[index + 1]
             openReader(nextPassage, current.dayNumber)
@@ -289,10 +311,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun prevChapterInReader() {
         val current = _readerSession.value ?: return
         val dayPlan = repository.getDayPlan(uiState.value.activePlan.id, current.dayNumber)
-        val index = dayPlan.passages.indexOfFirst { it.bookCode == current.bookCode && it.chapter == current.chapter }
-        if (index > 0) {
+        val matchedIndex = dayPlan.passages.indexOfFirst {
+            it.bookCode == current.bookCode && it.chapter == current.chapter && it.passageLabel == current.passageLabel
+        }
+        val index = if (matchedIndex >= 0) matchedIndex else current.passageIndex
+        if (index > 0 && index < dayPlan.passages.size) {
             val prevPassage = dayPlan.passages[index - 1]
             openReader(prevPassage, current.dayNumber)
+        }
+    }
+
+    fun markPassageCompleted(passage: ReadingPassage, dayNumber: Int) {
+        viewModelScope.launch {
+            val key = "$dayNumber-${passage.bookCode}-${passage.chapter}"
+            val isCompleted = uiState.value.completedKeys.contains(key)
+            if (!isCompleted) {
+                val planId = uiState.value.activePlan.id
+                repository.togglePassageCompletion(planId, dayNumber, passage, currentlyCompleted = false)
+            }
         }
     }
 
@@ -301,9 +337,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val passage = ReadingPassage(
             bookCode = current.bookCode,
             bookName = current.bookName,
-            chapter = current.chapter
+            chapter = current.chapter,
+            passageLabel = current.passageLabel
         )
         togglePassage(passage, current.dayNumber)
+    }
+
+    fun markCurrentReaderPassageCompletedAndNext() {
+        val current = _readerSession.value ?: return
+        val passage = ReadingPassage(
+            bookCode = current.bookCode,
+            bookName = current.bookName,
+            chapter = current.chapter,
+            passageLabel = current.passageLabel
+        )
+        markPassageCompleted(passage, current.dayNumber)
+        nextChapterInReader()
     }
 
     fun selectPlan(planId: String) {

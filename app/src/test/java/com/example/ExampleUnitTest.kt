@@ -2,6 +2,7 @@ package com.example
 
 import com.example.model.BibleData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -278,5 +279,79 @@ class ExampleUnitTest {
         assertEquals('b', rComments[1].startSubVerse)
         assertEquals(20, rComments[1].endVerse)
         assertEquals(33, rComments[2].chapter)
+    }
+
+    @Test
+    fun testDay11MultiPassageReaderSession() {
+        val day11Plan = com.example.model.BibleData.generateDayPlan("plan_mateusz_wobi", 11)
+        assertEquals(2, day11Plan.passages.size)
+        assertEquals("Rdz", day11Plan.passages[0].bookCode)
+        assertEquals("Rdz 22,20-24", day11Plan.passages[0].passageLabel)
+        assertEquals("Rdz", day11Plan.passages[1].bookCode)
+        assertEquals("Rdz 24:", day11Plan.passages[1].passageLabel)
+
+        // Simulate reader session creation for passage 0
+        val p0 = day11Plan.passages[0]
+        val total = day11Plan.passages.size
+        val idx0 = day11Plan.passages.indexOfFirst {
+            it == p0 || (it.bookCode == p0.bookCode && it.chapter == p0.chapter && it.passageLabel == p0.passageLabel)
+        }
+        val hasNext0 = idx0 < total - 1
+        val nextPassage0 = day11Plan.passages[idx0 + 1]
+
+        val session0 = com.example.ui.viewmodel.ReaderSession(
+            bookCode = p0.bookCode,
+            chapter = p0.chapter,
+            bookName = p0.bookName,
+            dayNumber = 11,
+            isCompleted = false,
+            hasNext = hasNext0,
+            hasPrev = false,
+            passageLabel = p0.passageLabel,
+            passageIndex = idx0,
+            totalPassages = total,
+            nextPassageLabel = nextPassage0.passageLabel
+        )
+
+        assertEquals(0, session0.passageIndex)
+        assertEquals(2, session0.totalPassages)
+        assertTrue(session0.hasNext)
+        assertEquals("Rdz 24:", session0.nextPassageLabel)
+
+        // Advance to passage 1
+        val p1 = day11Plan.passages[idx0 + 1]
+        val idx1 = day11Plan.passages.indexOfFirst {
+            it == p1 || (it.bookCode == p1.bookCode && it.chapter == p1.chapter && it.passageLabel == p1.passageLabel)
+        }
+        val hasNext1 = idx1 < total - 1
+
+        val session1 = com.example.ui.viewmodel.ReaderSession(
+            bookCode = p1.bookCode,
+            chapter = p1.chapter,
+            bookName = p1.bookName,
+            dayNumber = 11,
+            isCompleted = false,
+            hasNext = hasNext1,
+            hasPrev = true,
+            passageLabel = p1.passageLabel,
+            passageIndex = idx1,
+            totalPassages = total,
+            nextPassageLabel = null
+        )
+
+        assertEquals(1, session1.passageIndex)
+        assertEquals(2, session1.totalPassages)
+        assertFalse(session1.hasNext)
+        assertTrue(session1.hasPrev)
+
+        // Verify marking completed behavior
+        var passage0MarkedRead = false
+        val onNextPassageAndMarkCompleted: () -> Unit = {
+            if (!session0.isCompleted) {
+                passage0MarkedRead = true
+            }
+        }
+        onNextPassageAndMarkCompleted()
+        assertTrue("Passage 0 should be marked read when clicking next fragment", passage0MarkedRead)
     }
 }

@@ -63,14 +63,20 @@ import com.example.ui.viewmodel.UiState
 
 import androidx.compose.ui.unit.sp
 
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.outlined.Circle
 import com.example.model.BibleSource
+import com.example.service.auth.PismoswieteAuthManager
+import com.example.service.pericope.BibleExtractionEngine
+import com.example.ui.components.PismoswieteLoginSheet
 import com.example.ui.viewmodel.AppThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -93,6 +99,12 @@ fun SettingsScreen(
 
     var showResetDialog by remember { mutableStateOf(false) }
     var showTimeDialog by remember { mutableStateOf(false) }
+    var showPismoswieteLogin by remember { mutableStateOf(false) }
+    var loginStateTrigger by remember { mutableIntStateOf(0) }
+
+    val isPismoswieteLoggedIn = remember(context, loginStateTrigger) {
+        PismoswieteAuthManager.isLoggedIn(context)
+    }
 
     var selectedHour by remember(uiState.userState.reminderHour) {
         mutableIntStateOf(uiState.userState.reminderHour)
@@ -610,6 +622,72 @@ fun SettingsScreen(
             }
         }
 
+        // Karta konta pismoswiete.pl
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("pismoswiete_account_card"),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = null,
+                            tint = if (isPismoswieteLoggedIn) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Konto pismoswiete.pl",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = if (isPismoswieteLoggedIn) "Zalogowano — pełny dostęp do wszystkich rozdziałów Edycji Św. Pawła" else "Niezalogowany — rozdziały po 1. wymagają logowania (automatycznie używane jest biblia.deon.pl)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    if (isPismoswieteLoggedIn) {
+                        OutlinedButton(
+                            onClick = {
+                                PismoswieteAuthManager.clearSession(context)
+                                BibleExtractionEngine.clearCache(context)
+                                loginStateTrigger++
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("logout_pismoswiete_button")
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Wyloguj z pismoswiete.pl")
+                        }
+                    } else {
+                        Button(
+                            onClick = { showPismoswieteLogin = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("login_pismoswiete_button")
+                        ) {
+                            Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Zaloguj lub zarejestruj w pismoswiete.pl")
+                        }
+                    }
+                }
+            }
+        }
+
         // Reset plan section
         item {
             Card(
@@ -751,6 +829,13 @@ fun SettingsScreen(
                     Text("Zamknij")
                 }
             }
+        )
+    }
+
+    if (showPismoswieteLogin) {
+        PismoswieteLoginSheet(
+            onDismiss = { showPismoswieteLogin = false },
+            onLoginSuccess = { loginStateTrigger++ }
         )
     }
 }

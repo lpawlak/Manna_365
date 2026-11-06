@@ -1,9 +1,12 @@
 package com.example.ui.screens
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,12 +31,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.NavigateBefore
 import androidx.compose.material.icons.automirrored.filled.NavigateNext
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -47,6 +54,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -59,6 +67,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import com.example.service.auth.PismoswieteAuthManager
+import com.example.ui.components.PismoswieteLoginSheet
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -79,6 +89,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -123,6 +134,12 @@ fun NativePericopeReader(
     }
     var showFontSizeSheet by remember { mutableStateOf(false) }
     var showSourceMenu by remember { mutableStateOf(false) }
+    var showPismoswieteLogin by remember { mutableStateOf(false) }
+    var reloadKey by remember { mutableIntStateOf(0) }
+
+    val isPismoswieteLoggedIn = remember(context, reloadKey) {
+        PismoswieteAuthManager.isLoggedIn(context)
+    }
 
     var readingState by remember { mutableStateOf<PericopeReading?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -135,7 +152,7 @@ fun NativePericopeReader(
     }
 
     // Załaduj i wyekstrahuj wersety dla zadanego fragmentu
-    LaunchedEffect(session.bookCode, session.chapter, session.passageLabel, session.source) {
+    LaunchedEffect(session.bookCode, session.chapter, session.passageLabel, session.source, reloadKey) {
         isLoading = true
         hasError = false
         try {
@@ -248,6 +265,43 @@ fun NativePericopeReader(
                                 }
                             )
                         }
+
+                        HorizontalDivider()
+
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = if (isPismoswieteLoggedIn) "Konto pismoswiete.pl" else "Zaloguj do pismoswiete.pl",
+                                        fontWeight = FontWeight.Medium,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = if (isPismoswieteLoggedIn) "Zalogowano • Kliknij, aby wylogować" else "Odblokuj wszystkie rozdziały",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (isPismoswieteLoggedIn) Icons.Default.CheckCircle else Icons.Default.AccountCircle,
+                                    contentDescription = null,
+                                    tint = if (isPismoswieteLoggedIn) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                showSourceMenu = false
+                                if (isPismoswieteLoggedIn) {
+                                    PismoswieteAuthManager.clearSession(context)
+                                    BibleExtractionEngine.clearCache(context)
+                                    reloadKey++
+                                } else {
+                                    showPismoswieteLogin = true
+                                }
+                            },
+                            modifier = Modifier.testTag("reader_pismoswiete_auth_menu_item")
+                        )
                     }
                 }
 
@@ -429,22 +483,54 @@ fun NativePericopeReader(
                                 showChapterHeader = reading.sections.size > 1,
                                 fontSizeSp = fontSizeSp,
                                 textColor = textColor,
-                                isDarkTheme = isDarkTheme
+                                isDarkTheme = isDarkTheme,
+                                onOpenLogin = { showPismoswieteLogin = true }
                             )
                         }
 
                         item {
-                            Spacer(modifier = Modifier.height(48.dp))
+                            Spacer(modifier = Modifier.height(28.dp))
                             Surface(
                                 shape = CircleShape,
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(bottom = 32.dp)
+                                modifier = Modifier.padding(bottom = 14.dp)
                             ) {
                                 Text(
                                     text = "Koniec fragmentu na dziś",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                )
+                            }
+
+                            // Podlinkowana małą czcionką informacja o źródle tekstu
+                            val passageUrl = remember(session.bookCode, session.chapter, session.source) {
+                                com.example.model.ReadingPassage(session.bookCode, session.bookName, session.chapter).toUrl(session.source)
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .padding(bottom = 36.dp)
+                                    .clickable {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(passageUrl))
+                                        context.startActivity(intent)
+                                    }
+                                    .testTag("reader_source_attribution_link")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.OpenInBrowser,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(13.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Tekst pochodzi ze strony ${session.source.title}",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline
                                 )
                             }
                         }
@@ -656,6 +742,13 @@ fun NativePericopeReader(
             }
         }
     }
+
+    if (showPismoswieteLogin) {
+        PismoswieteLoginSheet(
+            onDismiss = { showPismoswieteLogin = false },
+            onLoginSuccess = { reloadKey++ }
+        )
+    }
 }
 
 @Composable
@@ -664,7 +757,8 @@ private fun SectionContent(
     showChapterHeader: Boolean,
     fontSizeSp: Int,
     textColor: Color,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    onOpenLogin: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -672,6 +766,58 @@ private fun SectionContent(
             .widthIn(max = 680.dp)
             .padding(vertical = 8.dp)
     ) {
+        // Informacja o pobraniu z deon.pl w razie braku logowania do pismoswiete.pl
+        if (section.isDeonFallback) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                ),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .testTag("section_login_fallback_banner")
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Rozdział wymaga bezpłatnego logowania w pismoswiete.pl",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "W pismoswiete.pl treść po rozdziale 1 jest dostępna dla zalogowanych. Załadowano tekst z biblia.deon.pl (Biblia Tysiąclecia), aby czytanie nie zostało przerwane.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FilledTonalButton(
+                        onClick = onOpenLogin,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .testTag("section_login_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Login,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Zaloguj się do pismoswiete.pl")
+                    }
+                }
+            }
+        }
         // Nagłówek rozdziału (np. "Rozdział 2"), gdy fragment obejmuje wiele rozdziałów
         if (showChapterHeader) {
             Row(

@@ -1,13 +1,16 @@
 package com.example.service.pericope
 
 /**
- * Reprezentuje zakres wersetów w obrębie danego rozdziału księgi.
+ * Reprezentuje zakres wersetów w obrębie danego rozdziału księgi,
+ * włącznie z opcjonalnymi podziałami na podwersety 'a' / 'b' (np. Rdz 2,4a vs Rdz 2,4b).
  */
 data class ChapterRange(
     val bookCode: String,
     val chapter: Int,
     val startVerse: Int = 1,
-    val endVerse: Int = Int.MAX_VALUE
+    val endVerse: Int = Int.MAX_VALUE,
+    val startSubVerse: Char? = null,
+    val endSubVerse: Char? = null
 )
 
 /**
@@ -26,7 +29,9 @@ data class PericopeSection(
     val bookName: String,
     val chapter: Int,
     val sectionTitle: String? = null,
-    val verses: List<ExtractedVerse>
+    val verses: List<ExtractedVerse>,
+    val isDeonFallback: Boolean = false,
+    val requiresLogin: Boolean = false
 )
 
 /**

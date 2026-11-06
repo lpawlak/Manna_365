@@ -3,6 +3,7 @@ package com.example.service.pericope
 import android.content.Context
 import com.example.model.BibleData
 import com.example.model.BibleSource
+import com.example.service.auth.PismoswieteAuthManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -15,6 +16,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.charset.Charset
 import java.util.concurrent.ConcurrentHashMap
+import java.util.regex.Pattern
 
 object BibleExtractionEngine {
 
@@ -37,13 +39,15 @@ object BibleExtractionEngine {
         val ranges = PericopeRangeParser.parse(bookCode, defaultChapter, label)
 
         // Równolegle pobierz i wyekstrahuj sekcje dla każdego wymaganego rozdziału
-        val sections = coroutineScope {
+        val rawSections = coroutineScope {
             ranges.map { range ->
                 async {
                     extractChapterSection(context, range, bookName, source)
                 }
             }.awaitAll()
         }
+
+        val mergedSections = mergeConsecutiveSameChapterSections(rawSections)
 
         val sourceTitle = when (source) {
             BibleSource.PISMOSWIETE -> "Pismo Święte (Edycja Św. Pawła)"
@@ -55,8 +59,26 @@ object BibleExtractionEngine {
             bookName = bookName,
             passageLabel = label,
             sourceName = sourceTitle,
-            sections = sections
+            sections = mergedSections
         )
+    }
+
+    private fun mergeConsecutiveSameChapterSections(sections: List<PericopeSection>): List<PericopeSection> {
+        if (sections.size <= 1) return sections
+        val merged = mutableListOf<PericopeSection>()
+        for (sec in sections) {
+            val last = merged.lastOrNull()
+            if (last != null && last.chapter == sec.chapter && last.bookCode == sec.bookCode && last.isDeonFallback == sec.isDeonFallback) {
+                val combinedVerses = (last.verses + sec.verses).distinctBy { it.verseNumber }
+                merged[merged.lastIndex] = last.copy(
+                    verses = combinedVerses,
+                    sectionTitle = last.sectionTitle ?: sec.sectionTitle
+                )
+            } else {
+                merged.add(sec)
+            }
+        }
+        return merged
     }
 
     private suspend fun extractChapterSection(
@@ -67,18 +89,30 @@ object BibleExtractionEngine {
     ): PericopeSection {
         var rawHtml: String? = null
         var isDeon = false
+        var isFallback = false
+        var requiresLogin = false
 
         if (preferredSource == BibleSource.PISMOSWIETE) {
             val pismoJson = fetchChapterPismoswiete(context, range.bookCode, range.chapter)
-            if (pismoJson != null && !pismoJson.contains("Treść dostępna tylko dla osób zalogowanych", ignoreCase = true)) {
-                rawHtml = extractPismoswieteContent(pismoJson)
+            if (pismoJson != null && !isLoginRequired(pismoJson)) {
+                val content = extractPismoswieteContent(pismoJson)
+                if (!content.isNullOrBlank() && !isLoginRequired(content)) {
+                    rawHtml = content
+                } else {
+                    requiresLogin = true
+                }
+            } else {
+                requiresLogin = true
             }
         }
 
-        // Jeśli wybrano DEON lub pismoswiete było niedostępne / zablokowane
+        // Jeśli wybrano DEON lub pismoswiete było niedostępne / zablokowane logowaniem
         if (rawHtml == null) {
             rawHtml = fetchChapterDeon(context, range.bookCode, range.chapter)
             isDeon = true
+            if (preferredSource == BibleSource.PISMOSWIETE && requiresLogin) {
+                isFallback = true
+            }
         }
 
         if (rawHtml.isNullOrBlank()) {
@@ -87,15 +121,29 @@ object BibleExtractionEngine {
                 bookName = bookName,
                 chapter = range.chapter,
                 sectionTitle = "Rozdział ${range.chapter}",
-                verses = listOf(ExtractedVerse(range.startVerse, "Nie udało się załadować tekstu. Sprawdź połączenie z internetem."))
+                verses = listOf(ExtractedVerse(range.startVerse, "Nie udało się załadować tekstu. Sprawdź połączenie z internetem.")),
+                isDeonFallback = isFallback,
+                requiresLogin = requiresLogin
             )
         }
 
-        return if (isDeon) {
+        val section = if (isDeon) {
             parseDeonVerses(rawHtml, range, bookName)
         } else {
             parsePismoswieteVerses(rawHtml, range, bookName)
         }
+
+        // Jeśli parser zwrócił 0 wersetów ze źródła pismoswiete, oznacza to, że treść była niedostępna
+        // Wtedy natychmiastowo pobieramy treść z deon.pl jako zabezpieczenie przed pustym polem!
+        if (section.verses.isEmpty() && !isDeon) {
+            val deonHtml = fetchChapterDeon(context, range.bookCode, range.chapter)
+            if (!deonHtml.isNullOrBlank()) {
+                val deonSection = parseDeonVerses(deonHtml, range, bookName)
+                return deonSection.copy(isDeonFallback = true, requiresLogin = true)
+            }
+        }
+
+        return section.copy(isDeonFallback = isFallback, requiresLogin = requiresLogin)
     }
 
     // =========================================================================
@@ -103,9 +151,14 @@ object BibleExtractionEngine {
     // =========================================================================
 
     private fun parseDeonVerses(html: String, range: ChapterRange, bookName: String): PericopeSection {
+        var preCleaned = html
+            .replace(Regex("<div class=[\"']bottom-navi[\"']>.*?</div>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
+            .replace(Regex("<div class=[\"']footnotes[\"']>.*?</div>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
+            .replace(Regex("<div class=[\"']mobile-nav-wrapper[\"']>.*?</div>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
+
         val contentRegex = Regex("<div class=[\"'](?:tresc|the-content)[\"']>(.*?)</div>\\s*<!-- END the-content -->", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE))
-        val contentMatch = contentRegex.find(html)
-        val content = contentMatch?.groupValues?.get(1) ?: html
+        val contentMatch = contentRegex.find(preCleaned)
+        val content = contentMatch?.groupValues?.get(1) ?: preCleaned
 
         // Podział wersetów poznaczonych znacznikami <a name="W{numer}"></a>
         val parts = content.split(Regex("<a name=[\"']W(\\d+)[\"']></a>"))
@@ -121,8 +174,6 @@ object BibleExtractionEngine {
             }
         }
 
-        // parts[0] = nagłówek, od 1 co 2 występuje numer wersetu (jeśli split z dopasowaniem)
-        // W standardowym split numer wersetu musimy dopasować ze znaczników
         val verseMarkers = Regex("<a name=[\"']W(\\d+)[\"']></a>").findAll(content).toList()
         for (idx in verseMarkers.indices) {
             val vNum = verseMarkers[idx].groupValues[1].toIntOrNull() ?: (idx + 1)
@@ -132,20 +183,30 @@ object BibleExtractionEngine {
                 // Sprawdź śródtytuł wewnątrz wersetu
                 val mTitle = Regex("<div class=[\"']?miedzytytul\\d*[\"']?>(.*?)</div>", RegexOption.IGNORE_CASE).find(chunk)
                 if (mTitle != null && chapterTitle == null) {
-                    chapterTitle = cleanHtml(mTitle.groupValues[1])
+                    val isEndingAtSubA = (vNum == range.endVerse && range.endSubVerse == 'a')
+                    if (!isEndingAtSubA) {
+                        chapterTitle = cleanHtml(mTitle.groupValues[1])
+                    }
                 }
 
                 var cleanText = chunk
+                cleanText = cleanText.replace(Regex("<div class=[\"']?bottom-navi[\"']?>.*?</div>", setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)), "")
                 cleanText = cleanText.replace(Regex("<div class=[\"']?miedzytytul\\d*[\"']?>.*?</div>", RegexOption.IGNORE_CASE), "")
                 cleanText = cleanText.replace(Regex("<sup>.*?</sup>", RegexOption.IGNORE_CASE), "")
                 cleanText = cleanText.replace(Regex("<span class=[\"']werset[\"']>.*?</span>", RegexOption.IGNORE_CASE), "")
                 cleanText = cleanHtml(cleanText)
 
                 // Usuń ewentualne strzałki nawigacyjne «« Rdz X »» na końcu rozdziału
-                cleanText = cleanText.replace(Regex("[«»]+.*[«»]+"), "").trim()
+                cleanText = cleanText.replace(Regex("[«»\\s]*[1-4]?\\s*[A-ZĄĆĘŁŃÓŚŹŻa-ząćęłńóśźż]+\\s*\\d+[«»\\s]*$"), "").trim()
+                cleanText = cleanText.replace(Regex("[«»]{2,}.*?[«»]{2,}"), "").trim()
+                cleanText = cleanText.replace(Regex("[«»]{2,}"), "").trim()
+                cleanText = cleanText.replace(Regex("&[lr]aquo;"), "").trim()
 
-                if (cleanText.isNotBlank()) {
-                    verses.add(ExtractedVerse(vNum, cleanText))
+                // Filtrowanie podwersetów 'a', 'b', etc.
+                val filteredText = filterVerseText(cleanText, vNum, range)
+
+                if (filteredText.isNotBlank()) {
+                    verses.add(ExtractedVerse(vNum, filteredText))
                 }
             }
         }
@@ -175,42 +236,44 @@ object BibleExtractionEngine {
     }
 
     private fun parsePismoswieteVerses(content: String, range: ChapterRange, bookName: String): PericopeSection {
-        val markers = Regex("<span class=[\"']sigl sigl-start[\"'] data-sigl=[\"'](\\d+)[\"']></span>").findAll(content).toList()
-        val parts = content.split(Regex("<span class=[\"']sigl sigl-start[\"'] data-sigl=[\"']\\d+[\"']></span>"))
-
         val verses = mutableListOf<ExtractedVerse>()
         var chapterTitle: String? = null
 
         // Tytuł perykopy przed wersetem 1
-        if (parts.isNotEmpty() && range.startVerse <= 1) {
-            val mTitle = Regex("<div class=[\"']perykopa[\"']>(.*?)</div>", RegexOption.IGNORE_CASE).find(parts[0])
+        if (range.startVerse <= 1) {
+            val mTitle = Regex("<div class=[\"']perykopa[\"']>(.*?)</div>", RegexOption.IGNORE_CASE).find(content)
             if (mTitle != null) {
                 chapterTitle = cleanHtml(mTitle.groupValues[1])
             }
         }
 
-        for (idx in markers.indices) {
-            val vNum = markers[idx].groupValues[1].toIntOrNull() ?: (idx + 1)
-            if (vNum in range.startVerse..range.endVerse) {
-                val chunk = if (idx + 1 < parts.size) parts[idx + 1] else ""
+        val versePattern = Regex(
+            "<span class=[\"']sigl sigl-start[\"'] data-sigl=[\"'](\\d+)[\"']></span>.*?(?:<div class=[\"']perykopa[\"']>(.*?)</div>.*?)?<span class=[\"']werset[\"']>(.*?)</span>",
+            setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+        )
 
-                // Sprawdź śródtytuł
-                val mTitle = Regex("<div class=[\"']perykopa[\"']>(.*?)</div>", RegexOption.IGNORE_CASE).find(chunk)
-                if (mTitle != null && chapterTitle == null) {
-                    chapterTitle = cleanHtml(mTitle.groupValues[1])
+        val matches = versePattern.findAll(content).toList()
+        for (m in matches) {
+            val vNum = m.groupValues[1].toIntOrNull() ?: continue
+            if (vNum in range.startVerse..range.endVerse) {
+                val innerTitle = m.groupValues[2]
+                if (innerTitle.isNotBlank() && chapterTitle == null && vNum > 1) {
+                    val isEndingAtSubA = (vNum == range.endVerse && range.endSubVerse == 'a')
+                    if (!isEndingAtSubA) {
+                        chapterTitle = cleanHtml(innerTitle)
+                    }
                 }
 
-                var cleanText = chunk
-                cleanText = cleanText.replace(Regex("<div class=[\"']perykopa[\"']>.*?</div>", RegexOption.IGNORE_CASE), "")
-                cleanText = cleanText.replace(Regex("<a class=[\"']link[^>]*>.*?</a>", RegexOption.IGNORE_CASE), "")
-                cleanText = cleanText.replace(Regex("<sup class=[\"']werset-number[\"']>.*?</sup>", RegexOption.IGNORE_CASE), "")
+                val rawText = m.groupValues[3]
+                var cleanText = rawText.replace(Regex("<a class=[\"']link[^>]*>.*?</a>", RegexOption.IGNORE_CASE), "")
                 cleanText = cleanHtml(cleanText)
-
-                // Usuń ewentualne cyfry wiodące
                 cleanText = cleanText.replace(Regex("^\\d+\\s*"), "").trim()
 
-                if (cleanText.isNotBlank()) {
-                    verses.add(ExtractedVerse(vNum, cleanText))
+                // Filtrowanie podwersetów 'a', 'b', etc.
+                val filteredText = filterVerseText(cleanText, vNum, range)
+
+                if (filteredText.isNotBlank()) {
+                    verses.add(ExtractedVerse(vNum, filteredText))
                 }
             }
         }
@@ -222,6 +285,90 @@ object BibleExtractionEngine {
             sectionTitle = chapterTitle,
             verses = verses
         )
+    }
+
+    // =========================================================================
+    // FILTROWANIE PODWERSETÓW ('a' / 'b')
+    // =========================================================================
+
+    /**
+     * Dzieli tekst wersetu na zdania lub klauzule i wyodrębnia odpowiednią część,
+     * np. 'a' -> pierwsze zdanie wiersza, 'b' -> od drugiego zdania do końca wiersza.
+     */
+    fun filterVerseText(verseText: String, vNum: Int, range: ChapterRange): String {
+        val needsStartSub = (vNum == range.startVerse && range.startSubVerse != null)
+        val needsEndSub = (vNum == range.endVerse && range.endSubVerse != null)
+
+        if (!needsStartSub && !needsEndSub) {
+            return verseText
+        }
+
+        val parts = splitVerseIntoSentences(verseText)
+        if (parts.size <= 1) {
+            return verseText
+        }
+
+        return when {
+            needsStartSub && needsEndSub -> {
+                val startIdx = subVerseToIndex(range.startSubVerse)
+                val endIdx = subVerseToIndex(range.endSubVerse)
+                val safeStart = startIdx.coerceIn(0, parts.lastIndex)
+                val safeEnd = endIdx.coerceIn(safeStart, parts.lastIndex)
+                parts.subList(safeStart, safeEnd + 1).joinToString(" ")
+            }
+            needsStartSub -> {
+                val startIdx = subVerseToIndex(range.startSubVerse)
+                val safeStart = startIdx.coerceIn(0, parts.lastIndex)
+                parts.subList(safeStart, parts.size).joinToString(" ")
+            }
+            needsEndSub -> {
+                val endIdx = subVerseToIndex(range.endSubVerse)
+                val safeEnd = endIdx.coerceIn(0, parts.lastIndex)
+                parts.subList(0, safeEnd + 1).joinToString(" ")
+            }
+            else -> verseText
+        }
+    }
+
+    fun splitVerseIntoSentences(text: String): List<String> {
+        val sentences = mutableListOf<String>()
+        val pattern = Pattern.compile("([^.!?]+[.!?]+)")
+        val matcher = pattern.matcher(text)
+        var lastIdx = 0
+        while (matcher.find()) {
+            val s = matcher.group(1).trim()
+            if (s.isNotEmpty()) {
+                sentences.add(s)
+            }
+            lastIdx = matcher.end()
+        }
+        if (lastIdx < text.length) {
+            val remainder = text.substring(lastIdx).trim()
+            if (remainder.isNotEmpty()) {
+                sentences.add(remainder)
+            }
+        }
+        return if (sentences.isNotEmpty()) sentences else listOf(text)
+    }
+
+    private fun subVerseToIndex(ch: Char?): Int = when (ch?.lowercaseChar()) {
+        'a' -> 0
+        'b' -> 1
+        'c' -> 2
+        'd' -> 3
+        else -> 0
+    }
+
+    // =========================================================================
+    // SPRAWDZANIE WYMAGANIA LOGOWANIA (PISMOSWIETE.PL)
+    // =========================================================================
+
+    fun isLoginRequired(content: String): Boolean {
+        return content.contains("Treść dostępna tylko dla osób zalogowanych", ignoreCase = true) ||
+               content.contains("Tre\\u015b\\u0107 dost\\u0119pna tylko dla os\\u00f3b zalogowanych", ignoreCase = true) ||
+               (content.contains("class=\"demo\"", ignoreCase = true) && content.contains("/login", ignoreCase = true)) ||
+               (content.contains("class=\\\"demo\\\"", ignoreCase = true) && content.contains("/login", ignoreCase = true)) ||
+               (content.contains("demo", ignoreCase = true) && content.contains("ZALOGUJ SI", ignoreCase = true))
     }
 
     // =========================================================================
@@ -245,6 +392,7 @@ object BibleExtractionEngine {
                 connectTimeout = 8000
                 readTimeout = 8000
                 setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Manna 365)")
+                instanceFollowRedirects = true
             }
 
             if (conn.responseCode == 200) {
@@ -268,8 +416,12 @@ object BibleExtractionEngine {
         val diskFile = getCacheFile(context, cacheKey)
         if (diskFile.exists() && diskFile.length() > 100) {
             val cached = diskFile.readText(Charsets.UTF_8)
-            memoryCache[cacheKey] = cached
-            return cached
+            if (!isLoginRequired(cached)) {
+                memoryCache[cacheKey] = cached
+                return cached
+            } else {
+                diskFile.delete()
+            }
         }
 
         return try {
@@ -279,13 +431,19 @@ object BibleExtractionEngine {
                 readTimeout = 8000
                 setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14; Manna 365)")
                 setRequestProperty("Accept", "application/json")
+                val cookie = PismoswieteAuthManager.getCookies(context)
+                if (!cookie.isNullOrBlank()) {
+                    setRequestProperty("Cookie", cookie)
+                }
             }
 
             if (conn.responseCode == 200) {
                 val text = conn.inputStream.bufferedReader(Charsets.UTF_8).readText()
                 if (text.length > 100) {
-                    memoryCache[cacheKey] = text
-                    diskFile.writeText(text, Charsets.UTF_8)
+                    if (!isLoginRequired(text)) {
+                        memoryCache[cacheKey] = text
+                        diskFile.writeText(text, Charsets.UTF_8)
+                    }
                     return text
                 }
             }
@@ -296,9 +454,14 @@ object BibleExtractionEngine {
     }
 
     private fun getCacheFile(context: Context, key: String): File {
-        val dir = File(context.cacheDir, "bible_cache")
+        val dir = File(context.cacheDir, "bible_cache_v4")
         if (!dir.exists()) dir.mkdirs()
         return File(dir, "$key.txt")
+    }
+
+    fun clearCache(context: Context) {
+        memoryCache.clear()
+        PismoswieteAuthManager.clearBibleCache(context)
     }
 
     private fun cleanHtml(text: String): String {
@@ -306,9 +469,12 @@ object BibleExtractionEngine {
             .replace(Regex("<[^>]+>"), "")
             .replace("&nbsp;", " ")
             .replace("&quot;", "\"")
+            .replace("&laquo;", "«")
+            .replace("&raquo;", "»")
             .replace("&#8222;", "„")
             .replace("&#8221;", "”")
             .replace("&apos;", "'")
+            .replace("&#39;", "'")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
             .replace("&amp;", "&")

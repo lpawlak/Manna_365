@@ -19,14 +19,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.ReadingPassage
 import com.example.ui.viewmodel.UiState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,11 +54,14 @@ import java.util.Locale
 @Composable
 fun ProgressScreen(
     uiState: UiState,
+    onOpenReader: (ReadingPassage, Int) -> Unit = { _, _ -> },
+    onToggleFavorite: (ReadingPassage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val completedCount = uiState.totalPlanCompletedCount
     val totalCount = uiState.totalPlanPassagesCount
     val progressPct = (uiState.planProgressRatio * 100).toInt()
+    val stats = uiState.readingStats
 
     LazyColumn(
         modifier = modifier
@@ -64,13 +73,13 @@ fun ProgressScreen(
         item {
             Column {
                 Text(
-                    text = "Twój Postęp",
+                    text = "Twój Postęp i Statystyki",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Statystyki lektury i regularności dla planu: ${uiState.activePlan.title}",
+                    text = "Plan: ${uiState.activePlan.title}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -132,58 +141,205 @@ fun ProgressScreen(
             }
         }
 
-        // 2x2 Grid of Quick Stats
+        // Section: Kluczowe statystyki lektury (2x2 Grid)
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Row 1: Czas czytania & Dni bez przerwy
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        title = "Czas czytania",
+                        value = stats.formattedReadingTime,
+                        subtitle = "Łącznie w czytniku",
+                        icon = Icons.Default.AccessTime,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    StatCard(
+                        title = "Dni bez przerwy",
+                        value = "${stats.currentStreakDays} dni",
+                        subtitle = "Rekord: ${stats.maxStreakDays} dni",
+                        icon = Icons.Default.LocalFireDepartment,
+                        iconTint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Row 2: Ulubiona pora & Przewidywany koniec planu
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        title = "Ulubiona pora",
+                        value = stats.favoriteTimeOfDay,
+                        subtitle = stats.favoriteTimeOfDayDetail,
+                        icon = Icons.Default.WbSunny,
+                        iconTint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    StatCard(
+                        title = "Koniec planu",
+                        value = stats.estimatedCompletionDate,
+                        subtitle = stats.paceDescription,
+                        icon = Icons.Default.Event,
+                        iconTint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+
+        // Section: Ulubione fragmenty (serduszka)
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                StatCard(
-                    title = "Seria dni",
-                    value = "${uiState.userState.streakDays} dni",
-                    subtitle = "Lektura z rzędu",
-                    icon = Icons.Default.LocalFireDepartment,
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
                 )
-
-                StatCard(
-                    title = "Dzień planu",
-                    value = "${uiState.userState.currentDay}",
-                    subtitle = "z ${uiState.activePlan.totalDays} dni",
-                    icon = Icons.Default.TrendingUp,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.weight(1f)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Ulubione fragmenty (${uiState.favoritePassages.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    title = "Rozdziały",
-                    value = "$completedCount",
-                    subtitle = "Wszystkie przeczytane",
-                    icon = Icons.AutoMirrored.Filled.MenuBook,
-                    iconTint = MaterialTheme.colorScheme.tertiary,
-                    modifier = Modifier.weight(1f)
-                )
+        if (uiState.favoritePassages.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Brak ulubionych fragmentów",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Kliknij ikonę serduszka przy dowolnym fragmencie w widoku dnia lub w czytniku, aby zapisać go tutaj.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        } else {
+            items(uiState.favoritePassages) { fav ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(38.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.errorContainer
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = fav.bookCode,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = fav.bookName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = fav.passageLabel,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
 
-                StatCard(
-                    title = "Pozostało",
-                    value = "${(totalCount - completedCount).coerceAtLeast(0)}",
-                    subtitle = "do końca planu",
-                    icon = Icons.Default.Star,
-                    iconTint = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.weight(1f)
-                )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            FilledTonalButton(
+                                onClick = {
+                                    val passage = ReadingPassage(
+                                        bookCode = fav.bookCode,
+                                        bookName = fav.bookName,
+                                        chapter = fav.chapter,
+                                        passageLabel = fav.passageLabel
+                                    )
+                                    onOpenReader(passage, uiState.displayedDay)
+                                },
+                                modifier = Modifier.height(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Czytaj", fontSize = 13.sp)
+                            }
+
+                            Spacer(modifier = Modifier.width(4.dp))
+
+                            IconButton(
+                                onClick = {
+                                    val passage = ReadingPassage(
+                                        bookCode = fav.bookCode,
+                                        bookName = fav.bookName,
+                                        chapter = fav.chapter,
+                                        passageLabel = fav.passageLabel
+                                    )
+                                    onToggleFavorite(passage)
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = "Usuń z ulubionych",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // Recent Completed Readings Log
+        // Section: Ostatnio ukończone fragmenty
         item {
             Text(
                 text = "Ostatnio ukończone fragmenty",
@@ -199,12 +355,13 @@ fun ProgressScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
@@ -212,6 +369,7 @@ fun ProgressScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Rozpocznij lekturę w zakładce „Dziś”, a Twoje przeczytane rozdziały pojawią się tutaj.",
                             style = MaterialTheme.typography.bodySmall,
@@ -314,14 +472,16 @@ private fun StatCard(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
             )
         }
     }

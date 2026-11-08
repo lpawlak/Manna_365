@@ -47,4 +47,22 @@ interface ReadingDao {
 
     @Query("DELETE FROM reading_progress WHERE planId = :planId")
     suspend fun clearPlanProgress(planId: String)
+
+    @Query("SELECT * FROM user_plan_state")
+    suspend fun getAllPlanStatesList(): List<UserPlanStateEntity>
+
+    @Query("SELECT * FROM reading_progress WHERE isCompleted = 1")
+    suspend fun getAllCompletedPassagesList(): List<ReadingProgressEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReadingProgress(progressList: List<ReadingProgressEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllPlanStates(planStates: List<UserPlanStateEntity>)
+
+    @Query("DELETE FROM reading_progress")
+    suspend fun clearAllReadingProgress()
+
+    @Query("DELETE FROM user_plan_state")
+    suspend fun clearAllPlanStates()
 }

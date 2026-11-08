@@ -354,4 +354,230 @@ class ExampleUnitTest {
         onNextPassageAndMarkCompleted()
         assertTrue("Passage 0 should be marked read when clicking next fragment", passage0MarkedRead)
     }
+
+    @Test
+    fun testTtsExtractScriptureTextExcludesTitlesChaptersAndVerseNumbers() {
+        val reading = com.example.service.pericope.PericopeReading(
+            bookCode = "Rdz",
+            bookName = "Księga Rodzaju",
+            passageLabel = "Rdz 22,20-24",
+            sourceName = "Biblia Tysiąclecia",
+            sections = listOf(
+                com.example.service.pericope.PericopeSection(
+                    bookCode = "Rdz",
+                    bookName = "Księga Rodzaju",
+                    chapter = 22,
+                    sectionTitle = "Dzieje potomstwa Nachora",
+                    verses = listOf(
+                        com.example.service.pericope.ExtractedVerse(
+                            verseNumber = 20,
+                            text = "Po tych wydarzeniach doniesiono Abrahamowi: Milka również urodziła synów twemu bratu, Nachorowi."
+                        ),
+                        com.example.service.pericope.ExtractedVerse(
+                            verseNumber = 21,
+                            text = "Usa, syna pierworodnego, Buza, jego brata, Kemuela, praojca Aramejczyków."
+                        )
+                    )
+                )
+            )
+        )
+
+        val spokenText = com.example.service.tts.BibleTtsManager.extractScriptureText(reading)
+
+        // Verifications:
+        // 1. Must NOT contain book title
+        assertFalse(spokenText.contains("Księga Rodzaju"))
+        // 2. Must NOT contain passage label
+        assertFalse(spokenText.contains("Rdz 22,20-24"))
+        // 3. Must NOT contain source name
+        assertFalse(spokenText.contains("Biblia Tysiąclecia"))
+        // 4. Must NOT contain chapter number or chapter header
+        assertFalse(spokenText.contains("Rozdział 22"))
+        assertFalse(spokenText.contains("Rozdział"))
+        // 5. Must NOT contain section title
+        assertFalse(spokenText.contains("Dzieje potomstwa Nachora"))
+        // 6. Must NOT contain verse numbers at start
+        assertFalse(spokenText.contains("20"))
+        assertFalse(spokenText.contains("21"))
+
+        // 7. MUST contain pure scripture text
+        assertTrue(spokenText.contains("Po tych wydarzeniach doniesiono Abrahamowi"))
+        assertTrue(spokenText.contains("Usa, syna pierworodnego"))
+    }
+
+    @Test
+    fun testTtsCleanVerseForSpeechAndSentenceSplitting() {
+        // Raw verse with HTML, leading number, brackets and quotes
+        val rawVerse = "<b>20</b> «Po tych wydarzeniach [rekonstrukcja] doniesiono Abrahamowi***.»"
+        val cleaned = com.example.service.tts.BibleTtsManager.cleanVerseForSpeech(rawVerse)
+
+        assertFalse(cleaned.contains("<b>"))
+        assertFalse(cleaned.contains("20"))
+        assertFalse(cleaned.contains("«"))
+        assertFalse(cleaned.contains("»"))
+        assertFalse(cleaned.contains("[rekonstrukcja]"))
+        assertFalse(cleaned.contains("***"))
+        assertEquals("Po tych wydarzeniach doniesiono Abrahamowi.", cleaned)
+
+        val sentences = com.example.service.tts.BibleTtsManager.splitIntoSentences(
+            "Na początku Bóg stworzył niebo i ziemię. Ziemia zaś była bezładem i pustkowiem. Czy to widzisz?"
+        )
+        assertEquals(3, sentences.size)
+        assertEquals("Na początku Bóg stworzył niebo i ziemię.", sentences[0])
+        assertEquals("Ziemia zaś była bezładem i pustkowiem.", sentences[1])
+        assertEquals("Czy to widzisz?", sentences[2])
+    }
+
+    @Test
+    fun testBackupManagerExportAndParse() {
+        val sampleStates = listOf(
+            com.example.data.entity.UserPlanStateEntity(
+                planId = "plan_mateusz_wobi",
+                isActive = true,
+                startDate = 1700000000000L,
+                currentDay = 15,
+                lastReadDateMillis = 1700005000000L,
+                streakDays = 5,
+                reminderHour = 7,
+                reminderMinute = 30,
+                reminderEnabled = true
+            )
+        )
+
+        val sampleProgress = listOf(
+            com.example.data.entity.ReadingProgressEntity(
+                planId = "plan_mateusz_wobi",
+                dayNumber = 1,
+                bookCode = "Rdz",
+                chapter = 1,
+                isCompleted = true,
+                completedAt = 1700001000000L
+            ),
+            com.example.data.entity.ReadingProgressEntity(
+                planId = "plan_mateusz_wobi",
+                dayNumber = 2,
+                bookCode = "Rdz",
+                chapter = 2,
+                isCompleted = true,
+                completedAt = 1700002000000L
+            )
+        )
+
+        val sampleSettings = mapOf(
+            "preferred_bible_source" to "deon",
+            "app_theme_mode" to "dark",
+            "pref_use_native_reader" to true,
+            "native_reader_font_size" to 20,
+            "font_zoom_percent" to 140
+        )
+
+        // 1. Export do JSON
+        val json = com.example.service.backup.BackupManager.createBackupJsonFromData(
+            planStates = sampleStates,
+            progressList = sampleProgress,
+            activePlanId = "plan_mateusz_wobi",
+            settings = sampleSettings
+        )
+
+        assertNotNull(json)
+        assertTrue(json.contains("\"appName\": \"Manna 365\""))
+        assertTrue(json.contains("\"planStates\""))
+        assertTrue(json.contains("\"readingProgress\""))
+        assertTrue(json.contains("\"preferred_bible_source\": \"deon\""))
+        assertTrue(json.contains("\"plan_mateusz_wobi\""))
+
+        // 2. Parsowanie z JSON
+        val result = com.example.service.backup.BackupManager.parseBackupJsonData(json)
+        assertTrue(result.success)
+        assertEquals(2, result.importedProgressCount)
+        assertEquals(1, result.importedPlansCount)
+        assertEquals(1, result.states.size)
+        assertEquals("plan_mateusz_wobi", result.states.first().planId)
+        assertEquals(15, result.states.first().currentDay)
+        assertEquals(2, result.progress.size)
+        assertEquals("deon", result.restoredSettings["preferred_bible_source"])
+        assertEquals("dark", result.restoredSettings["app_theme_mode"])
+        assertEquals(20, result.restoredSettings["native_reader_font_size"])
+
+        // 3. Test nieprawidłowego JSON
+        val invalidResult = com.example.service.backup.BackupManager.parseBackupJsonData("{ \"invalid\": true }")
+        assertFalse(invalidResult.success)
+        assertTrue(invalidResult.message.contains("brak wymaganych sekcji") || invalidResult.message.contains("Błąd"))
+    }
+
+    @Test
+    fun testReadingStatsFormattingAndCalculations() {
+        // 1. Czas czytania
+        assertEquals("0 min", com.example.model.ReadingStatsCalculator.formatReadingTime(0L))
+        assertEquals("< 1 min", com.example.model.ReadingStatsCalculator.formatReadingTime(45L))
+        assertEquals("15 min", com.example.model.ReadingStatsCalculator.formatReadingTime(15 * 60L))
+        assertEquals("1 godz. 20 min", com.example.model.ReadingStatsCalculator.formatReadingTime(80 * 60L))
+        assertEquals("2 godz.", com.example.model.ReadingStatsCalculator.formatReadingTime(120 * 60L))
+
+        // 2. Seria dni bez przerwy (Streak)
+        val now = System.currentTimeMillis()
+        val (streakToday, maxStreak1, _) = com.example.model.ReadingStatsCalculator.calculateStreak(now, 5, 10)
+        assertEquals(5, streakToday)
+        assertEquals(10, maxStreak1)
+
+        val yesterday = now - 24 * 60 * 60 * 1000L
+        val (streakYesterday, _, _) = com.example.model.ReadingStatsCalculator.calculateStreak(yesterday, 7, 7)
+        assertEquals(7, streakYesterday)
+
+        val threeDaysAgo = now - 3 * 24 * 60 * 60 * 1000L
+        val (streakBroken, maxStreak2, _) = com.example.model.ReadingStatsCalculator.calculateStreak(threeDaysAgo, 7, 12)
+        assertEquals(0, streakBroken)
+        assertEquals(12, maxStreak2)
+
+        // 3. Ulubiona pora dnia
+        val morningCalendar = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 8)
+            set(java.util.Calendar.MINUTE, 30)
+        }
+        val morningReadings = listOf(
+            com.example.data.entity.ReadingProgressEntity("p1", 1, "Rdz", 1, true, morningCalendar.timeInMillis),
+            com.example.data.entity.ReadingProgressEntity("p1", 2, "Rdz", 2, true, morningCalendar.timeInMillis)
+        )
+        val (favTitle, favDetail, slots) = com.example.model.ReadingStatsCalculator.calculateFavoriteTime(morningReadings)
+        assertTrue(favTitle.contains("Poranek"))
+        assertTrue(favTitle.contains("100%"))
+        assertTrue(favDetail.contains("08:00"))
+        assertEquals(4, slots.size)
+
+        // 4. Przewidywane zakończenie planu
+        val plan = com.example.model.BibleData.availablePlans.first()
+        val userState = com.example.data.entity.UserPlanStateEntity(
+            planId = plan.id,
+            currentDay = 10,
+            startDate = now - 10 * 24 * 60 * 60 * 1000L
+        )
+        val (estDate, estDaysRemaining, paceDesc) = com.example.model.ReadingStatsCalculator.calculateEstimatedCompletion(
+            plan,
+            userState,
+            morningReadings
+        )
+        assertNotNull(estDate)
+        assertTrue(estDaysRemaining > 0)
+        assertTrue(paceDesc.contains("tempo"))
+    }
+
+    @Test
+    fun testFavoritePassageSerialization() {
+        val list = listOf(
+            com.example.model.FavoritePassage("Rdz", "Księga Rodzaju", 1, "Rdz 1,1 - 2,4a", 1700000000000L),
+            com.example.model.FavoritePassage("J", "Ewangelia wg św. Jana", 3, "J 3,16-21", 1700001000000L)
+        )
+        val json = com.example.model.FavoritePassageStorage.serializeList(list)
+        assertTrue(json.contains("Księga Rodzaju"))
+        assertTrue(json.contains("J 3,16-21"))
+
+        val deserialized = com.example.model.FavoritePassageStorage.deserializeList(json)
+        assertEquals(2, deserialized.size)
+        assertEquals("Rdz", deserialized[0].bookCode)
+        assertEquals("Rdz 1,1 - 2,4a", deserialized[0].passageLabel)
+        assertEquals("J", deserialized[1].bookCode)
+        assertEquals("J 3,16-21", deserialized[1].passageLabel)
+    }
 }
+
+

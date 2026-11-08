@@ -25,10 +25,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -72,6 +74,7 @@ fun HomeScreen(
     onJumpToToday: () -> Unit,
     onMarkDayCompleted: () -> Unit,
     onNavigateToPlans: () -> Unit,
+    onToggleFavorite: (ReadingPassage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val passages = uiState.dayPlan.passages
@@ -362,6 +365,27 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    // Favorite button (Heart)
+                    val labelStr = passage.passageLabel.ifBlank { "${passage.bookName}, rozdz. ${passage.chapter}" }
+                    val favKey = "${passage.bookCode}-${passage.chapter}-$labelStr"
+                    val isFavorite = uiState.favoriteKeys.contains(favKey) || uiState.favoritePassages.any { it.bookCode == passage.bookCode && it.chapter == passage.chapter }
+
+                    IconButton(
+                        onClick = { onToggleFavorite(passage) },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .testTag("fav_btn_${passage.bookCode}_${passage.chapter}")
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = if (isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych",
+                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     // Read button
                     FilledTonalButton(

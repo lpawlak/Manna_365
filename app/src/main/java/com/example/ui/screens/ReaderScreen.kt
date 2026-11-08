@@ -95,11 +95,15 @@ import com.example.ui.viewmodel.ReaderSession
 import kotlinx.coroutines.launch
 
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import com.example.model.BibleSource
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 private const val READER_PREFS = "reader_settings"
 private const val KEY_FONT_ZOOM = "font_zoom_percent"
@@ -447,11 +451,30 @@ fun ReaderScreen(
     onSwitchToNativeReader: () -> Unit = {},
     isDarkTheme: Boolean = false,
     onToggleTheme: () -> Unit = {},
+    onToggleFavorite: () -> Unit = {},
+    onRecordReadingTime: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     BackHandler { onClose() }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(10_000L)
+            onRecordReadingTime(10L)
+        }
+    }
+
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        val enterTime = System.currentTimeMillis()
+        onDispose {
+            val leftoverSeconds = ((System.currentTimeMillis() - enterTime) / 1000) % 10
+            if (leftoverSeconds > 0) {
+                onRecordReadingTime(leftoverSeconds)
+            }
+        }
+    }
 
     val sharedPrefs = remember(context) {
         context.getSharedPreferences(READER_PREFS, Context.MODE_PRIVATE)
@@ -492,18 +515,27 @@ fun ReaderScreen(
         // Top App Bar
         TopAppBar(
             title = {
+                val shortBookTitle = remember(session.bookCode, session.chapter, session.passageLabel) {
+                    if (session.passageLabel.startsWith(session.bookCode)) {
+                        session.passageLabel
+                    } else {
+                        "${session.bookCode} ${session.chapter}"
+                    }
+                }
                 Column {
                     Text(
-                        text = "${session.bookName} ${session.chapter}",
+                        text = shortBookTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${session.source.shortLabel} • Dzień ${session.dayNumber}",
+                        text = "Dzień ${session.dayNumber}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             },
@@ -597,6 +629,18 @@ fun ReaderScreen(
                         imageVector = Icons.AutoMirrored.Filled.MenuBook,
                         contentDescription = "Przełącz na natywny czytnik perykop",
                         tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Ulubione (serduszko)
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.testTag("reader_favorite_button")
+                ) {
+                    Icon(
+                        imageVector = if (session.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (session.isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych",
+                        tint = if (session.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
                     )
                 }
 

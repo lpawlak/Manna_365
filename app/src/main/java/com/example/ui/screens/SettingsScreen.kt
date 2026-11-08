@@ -77,6 +77,14 @@ import com.example.model.BibleSource
 import com.example.service.auth.PismoswieteAuthManager
 import com.example.service.pericope.BibleExtractionEngine
 import com.example.ui.components.PismoswieteLoginSheet
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.example.service.backup.BackupManager
+import com.example.service.backup.BackupRestoreResult
 import com.example.ui.viewmodel.AppThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -87,9 +95,12 @@ fun SettingsScreen(
     onResetPlan: () -> Unit,
     onSetBibleSource: (BibleSource) -> Unit = {},
     onSetThemeMode: (AppThemeMode) -> Unit = {},
+    onExportBackup: suspend () -> String = { "" },
+    onImportBackup: suspend (String) -> BackupRestoreResult = { BackupRestoreResult(false, message = "") },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val sharedPrefs = remember(context) {
         context.getSharedPreferences("reader_settings", Context.MODE_PRIVATE)
     }
@@ -101,6 +112,52 @@ fun SettingsScreen(
     var showTimeDialog by remember { mutableStateOf(false) }
     var showPismoswieteLogin by remember { mutableStateOf(false) }
     var loginStateTrigger by remember { mutableIntStateOf(0) }
+
+    var backupStatusMessage by remember { mutableStateOf<String?>(null) }
+    var pendingRestoreJson by remember { mutableStateOf<String?>(null) }
+    var pendingRestoreResult by remember { mutableStateOf<BackupRestoreResult?>(null) }
+    var isOperatingBackup by remember { mutableStateOf(false) }
+
+    val exportFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                isOperatingBackup = true
+                val json = onExportBackup()
+                val ok = BackupManager.writeJsonToUri(context, uri, json)
+                isOperatingBackup = false
+                backupStatusMessage = if (ok) {
+                    "Kopia zapasowa została pomyślnie zapisana (Dysk Google / pamięć urządzenia)!"
+                } else {
+                    "Nie udało się zapisać pliku kopii zapasowej."
+                }
+            }
+        }
+    }
+
+    val importFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                isOperatingBackup = true
+                val json = BackupManager.readJsonFromUri(context, uri)
+                isOperatingBackup = false
+                if (json.isNullOrBlank()) {
+                    backupStatusMessage = "Nie udało się odczytać wybranego pliku lub plik jest pusty."
+                } else {
+                    val preview = BackupManager.parseBackupJson(context, json)
+                    if (preview.success) {
+                        pendingRestoreJson = json
+                        pendingRestoreResult = preview
+                    } else {
+                        backupStatusMessage = preview.message
+                    }
+                }
+            }
+        }
+    }
 
     val isPismoswieteLoggedIn = remember(context, loginStateTrigger) {
         PismoswieteAuthManager.isLoggedIn(context)
@@ -688,6 +745,108 @@ fun SettingsScreen(
             }
         }
 
+        // Backup & Cloud (Google Drive / JSON) section
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("backup_settings_card"),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cloud,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Kopia zapasowa i chmura",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Dysk Google / Plik JSON",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Możesz bezpiecznie wyeksportować swój postęp czytania ze wszystkich planów oraz ustawienia bezpośrednio na bezpłatny Dysk Google lub do pliku JSON w pamięci urządzenia. Pozwala to zachować historię czytania lub przenieść ją na inny telefon.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        // 1. Zapisz kopię (SAF - wybór Dysku Google lub pamięci urządzenia)
+                        Button(
+                            onClick = {
+                                val dateStr = java.text.SimpleDateFormat("yyyyMMdd_HHmm", java.util.Locale.getDefault()).format(java.util.Date())
+                                exportFileLauncher.launch("manna365_kopia_$dateStr.json")
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("export_backup_button"),
+                            enabled = !isOperatingBackup
+                        ) {
+                            Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Zapisz kopię (Dysk Google / Plik JSON)")
+                        }
+
+                        // 2. Udostępnij do chmury (Sharesheet - Dysk Google, Gmail itp.)
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    isOperatingBackup = true
+                                    val json = onExportBackup()
+                                    isOperatingBackup = false
+                                    BackupManager.shareBackupJson(context, json)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("share_backup_button"),
+                            enabled = !isOperatingBackup
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Udostępnij / Prześlij na Dysk Google")
+                        }
+
+                        // 3. Przywróć z Dysku Google lub pliku JSON
+                        OutlinedButton(
+                            onClick = {
+                                importFileLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("import_backup_button"),
+                            enabled = !isOperatingBackup
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Przywróć z Dysku Google / Pliku JSON")
+                        }
+                    }
+                }
+            }
+        }
+
         // Reset plan section
         item {
             Card(
@@ -838,4 +997,91 @@ fun SettingsScreen(
             onLoginSuccess = { loginStateTrigger++ }
         )
     }
+
+    // Confirmation Dialog for Restore
+    pendingRestoreResult?.let { preview ->
+        AlertDialog(
+            onDismissRequest = {
+                pendingRestoreResult = null
+                pendingRestoreJson = null
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CloudDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("Przywrócić kopię zapasową?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Znaleziono poprawne dane w pliku kopii zapasowej:")
+                    Text("• Przeczytane fragmenty: ${preview.importedProgressCount}", fontWeight = FontWeight.SemiBold)
+                    Text("• Plany czytania: ${preview.importedPlansCount}", fontWeight = FontWeight.SemiBold)
+                    if (preview.restoredSettings.isNotEmpty()) {
+                        Text("• Przywrócone ustawienia (motyw, czcionka, źródło)")
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Czy chcesz zastąpić bieżący postęp danymi z tej kopii?",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val json = pendingRestoreJson
+                        pendingRestoreResult = null
+                        pendingRestoreJson = null
+                        if (json != null) {
+                            coroutineScope.launch {
+                                isOperatingBackup = true
+                                val res = onImportBackup(json)
+                                isOperatingBackup = false
+                                backupStatusMessage = if (res.success) {
+                                    "Pomyślnie przywrócono postęp czytania (${res.importedProgressCount} fragmentów) i ustawienia!"
+                                } else {
+                                    "Błąd przywracania: ${res.message}"
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag("confirm_restore_button")
+                ) {
+                    Text("Tak, przywróć dane")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingRestoreResult = null
+                    pendingRestoreJson = null
+                }) {
+                    Text("Anuluj")
+                }
+            }
+        )
+    }
+
+    // Status / Feedback Alert Dialog
+    backupStatusMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { backupStatusMessage = null },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = { Text("Kopia zapasowa") },
+            text = { Text(msg) },
+            confirmButton = {
+                Button(onClick = { backupStatusMessage = null }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
 }
+

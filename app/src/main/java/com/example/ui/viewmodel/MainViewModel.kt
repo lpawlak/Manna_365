@@ -11,8 +11,12 @@ import com.example.data.repository.ReadingPlanRepository
 import com.example.model.BibleData
 import com.example.model.BibleSource
 import com.example.model.DayPlan
+import com.example.model.FavoritePassage
+import com.example.model.FavoritePassageStorage
 import com.example.model.PlanDefinition
 import com.example.model.ReadingPassage
+import com.example.model.ReadingStats
+import com.example.model.ReadingStatsCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +54,8 @@ data class ReaderSession(
     val useNativeReader: Boolean = true,
     val passageIndex: Int = 0,
     val totalPassages: Int = 1,
-    val nextPassageLabel: String? = null
+    val nextPassageLabel: String? = null,
+    val isFavorite: Boolean = false
 )
 
 data class UiState(
@@ -66,7 +71,10 @@ data class UiState(
     val readerSession: ReaderSession? = null,
     val allCompletedReadings: List<ReadingProgressEntity> = emptyList(),
     val selectedBibleSource: BibleSource = BibleSource.PISMOSWIETE,
-    val themeMode: AppThemeMode = AppThemeMode.SYSTEM
+    val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val readingStats: ReadingStats = ReadingStats(),
+    val favoritePassages: List<FavoritePassage> = emptyList(),
+    val favoriteKeys: Set<String> = emptySet()
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -102,18 +110,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.getCompletedPassagesForPlan(state.planId)
     }
 
+    private val _totalReadingSeconds = MutableStateFlow(sharedPrefs.getLong("total_reading_time_seconds", 0L))
+    private val _maxStreakDays = MutableStateFlow(sharedPrefs.getInt("max_streak_days", 0))
+    private val _favoritePassages = MutableStateFlow<List<FavoritePassage>>(
+        FavoritePassageStorage.deserializeList(sharedPrefs.getString("favorite_passages_json", null))
+    )
+
+    private data class ExtraStatsData(
+        val totalReadingSeconds: Long,
+        val maxStreakDays: Int,
+        val favoritePassages: List<FavoritePassage>
+    )
+
+    private val extraStatsFlow = combine(
+        _totalReadingSeconds,
+        _maxStreakDays,
+        _favoritePassages
+    ) { sec, maxStreak, favs ->
+        ExtraStatsData(sec, maxStreak, favs)
+    }
+
     private data class PlanData(
         val userState: UserPlanStateEntity,
         val completedList: List<ReadingProgressEntity>,
-        val allCompleted: List<ReadingProgressEntity>
+        val allCompleted: List<ReadingProgressEntity>,
+        val extraStats: ExtraStatsData
     )
 
     private val planDataFlow = combine(
         activePlanState,
         completedForActivePlan,
-        repository.getAllCompletedPassages()
-    ) { userState, completedList, allCompleted ->
-        PlanData(userState, completedList, allCompleted)
+        repository.getAllCompletedPassages(),
+        extraStatsFlow
+    ) { userState, completedList, allCompleted, extra ->
+        PlanData(userState, completedList, allCompleted, extra)
     }
 
     private data class ReaderPreferences(
@@ -137,6 +167,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val userState = planData.userState
         val completedList = planData.completedList
         val allCompleted = planData.allCompleted
+        val extraStats = planData.extraStats
+        val favList = extraStats.favoritePassages
+        val favKeys = favList.map { it.key }.toSet()
 
         val plan = availablePlans.firstOrNull { it.id == userState.planId } ?: availablePlans[0]
         val dayToShow = (selectedDay ?: userState.currentDay).coerceIn(1, plan.totalDays)
@@ -152,12 +185,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             (completedList.size.toFloat() / totalExpected).coerceIn(0f, 1f)
         } else 0f
 
-        // If reader session is open, update its completion state and source
+        val stats = ReadingStatsCalculator.computeStats(
+            totalReadingSeconds = extraStats.totalReadingSeconds,
+            activePlan = plan,
+            userState = userState,
+            readings = allCompleted,
+            storedMaxStreak = extraStats.maxStreakDays
+        )
+
+        // If reader session is open, update its completion state, source and favorite status
         val updatedReader = readerSession?.let { current ->
             val key = "${current.dayNumber}-${current.bookCode}-${current.chapter}"
+            val favKey = "${current.bookCode}-${current.chapter}-${current.passageLabel}"
             current.copy(
                 isCompleted = completedKeys.contains(key),
-                source = bibleSource
+                source = bibleSource,
+                isFavorite = favKeys.contains(favKey) || favList.any { it.bookCode == current.bookCode && it.chapter == current.chapter }
             )
         }
 
@@ -174,7 +217,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             readerSession = updatedReader,
             allCompletedReadings = allCompleted,
             selectedBibleSource = bibleSource,
-            themeMode = themeMode
+            themeMode = themeMode,
+            readingStats = stats,
+            favoritePassages = favList,
+            favoriteKeys = favKeys
         )
     }.stateIn(
         viewModelScope,
@@ -248,6 +294,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         val key = "$dayNumber-${passage.bookCode}-${passage.chapter}"
         val useNative = sharedPrefs.getBoolean("pref_use_native_reader", true)
+        val passageLabelStr = passage.passageLabel.ifBlank { "${passage.bookName}, rozdz. ${passage.chapter}" }
+        val favKey = "${passage.bookCode}-${passage.chapter}-$passageLabelStr"
+        val isFav = _favoritePassages.value.any { it.key == favKey || (it.bookCode == passage.bookCode && it.chapter == passage.chapter) }
 
         _readerSession.value = ReaderSession(
             bookCode = passage.bookCode,
@@ -258,12 +307,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             hasNext = hasNext,
             hasPrev = hasPrev,
             source = _selectedBibleSource.value,
-            passageLabel = passage.passageLabel.ifBlank { "${passage.bookName}, rozdz. ${passage.chapter}" },
+            passageLabel = passageLabelStr,
             useNativeReader = useNative,
             passageIndex = index,
             totalPassages = totalPassages,
-            nextPassageLabel = nextLabel
+            nextPassageLabel = nextLabel,
+            isFavorite = isFav
         )
+    }
+
+    fun recordReadingTime(seconds: Long) {
+        if (seconds <= 0) return
+        val newTotal = _totalReadingSeconds.value + seconds
+        _totalReadingSeconds.value = newTotal
+        sharedPrefs.edit().putLong("total_reading_time_seconds", newTotal).apply()
+    }
+
+    fun toggleFavoritePassage(passage: ReadingPassage) {
+        val label = passage.passageLabel.ifBlank { "${passage.bookName}, rozdz. ${passage.chapter}" }
+        val key = "${passage.bookCode}-${passage.chapter}-$label"
+        val current = _favoritePassages.value.toMutableList()
+        val existingIndex = current.indexOfFirst {
+            it.key == key || (it.bookCode == passage.bookCode && it.chapter == passage.chapter && it.passageLabel == label)
+        }
+        if (existingIndex >= 0) {
+            current.removeAt(existingIndex)
+        } else {
+            current.add(
+                0,
+                FavoritePassage(
+                    bookCode = passage.bookCode,
+                    bookName = passage.bookName,
+                    chapter = passage.chapter,
+                    passageLabel = label
+                )
+            )
+        }
+        _favoritePassages.value = current
+        sharedPrefs.edit().putString("favorite_passages_json", FavoritePassageStorage.serializeList(current)).apply()
+    }
+
+    fun toggleFavoriteInReader() {
+        val current = _readerSession.value ?: return
+        val passage = ReadingPassage(
+            bookCode = current.bookCode,
+            bookName = current.bookName,
+            chapter = current.chapter,
+            passageLabel = current.passageLabel
+        )
+        toggleFavoritePassage(passage)
     }
 
     fun setReaderMode(native: Boolean) {
@@ -375,5 +467,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.resetPlan(planId)
             _selectedDay.value = 1
         }
+    }
+
+    suspend fun createBackupJson(): String {
+        val (states, progress) = repository.exportAllData()
+        val activePlanId = uiState.value.activePlan.id
+        return com.example.service.backup.BackupManager.createBackupJson(
+            context = getApplication(),
+            planStates = states,
+            progressList = progress,
+            activePlanId = activePlanId
+        )
+    }
+
+    suspend fun restoreBackupFromJson(jsonString: String): com.example.service.backup.BackupRestoreResult {
+        val result = com.example.service.backup.BackupManager.parseBackupJson(getApplication(), jsonString)
+        if (result.success) {
+            repository.importAllData(result.states, result.progress, replaceExisting = true)
+            val sourceId = sharedPrefs.getString("preferred_bible_source", BibleSource.PISMOSWIETE.id)
+            _selectedBibleSource.value = BibleSource.fromId(sourceId)
+            val themeId = sharedPrefs.getString("app_theme_mode", AppThemeMode.SYSTEM.id)
+            _themeMode.value = AppThemeMode.fromId(themeId)
+            _totalReadingSeconds.value = sharedPrefs.getLong("total_reading_time_seconds", 0L)
+            _maxStreakDays.value = sharedPrefs.getInt("max_streak_days", 0)
+            _favoritePassages.value = FavoritePassageStorage.deserializeList(sharedPrefs.getString("favorite_passages_json", null))
+        }
+        return result
     }
 }

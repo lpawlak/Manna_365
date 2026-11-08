@@ -42,9 +42,17 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Login
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -66,13 +74,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import com.example.service.auth.PismoswieteAuthManager
+import com.example.service.tts.BibleTtsManager
+import com.example.service.tts.TtsPlaybackState
 import com.example.ui.components.PismoswieteLoginSheet
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -101,6 +114,11 @@ import com.example.service.pericope.PericopeReading
 import com.example.service.pericope.PericopeSection
 import com.example.ui.viewmodel.ReaderSession
 
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+
 private const val READER_PREFS = "reader_settings"
 private const val KEY_FONT_SIZE_SP = "native_reader_font_size"
 private const val DEFAULT_FONT_SIZE = 18
@@ -121,13 +139,52 @@ fun NativePericopeReader(
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit,
     modifier: Modifier = Modifier,
+    onToggleFavorite: () -> Unit = {},
+    onRecordReadingTime: (Long) -> Unit = {},
     onNextPassageAndMarkCompleted: () -> Unit = {
         if (!session.isCompleted) onToggleCompleted()
         onNextPassage()
     }
 ) {
     val context = LocalContext.current
-    BackHandler { onClose() }
+
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            delay(10_000L)
+            onRecordReadingTime(10L)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val enterTime = System.currentTimeMillis()
+        onDispose {
+            val leftoverSeconds = ((System.currentTimeMillis() - enterTime) / 1000) % 10
+            if (leftoverSeconds > 0) {
+                onRecordReadingTime(leftoverSeconds)
+            }
+        }
+    }
+
+    val ttsManager = remember(context) {
+        BibleTtsManager(context)
+    }
+    val ttsPlaybackState by ttsManager.playbackState.collectAsState()
+    val ttsSpeechRate by ttsManager.speechRate.collectAsState()
+
+    DisposableEffect(ttsManager) {
+        onDispose {
+            ttsManager.shutdown()
+        }
+    }
+
+    LaunchedEffect(session.bookCode, session.chapter, session.passageLabel) {
+        ttsManager.stop()
+    }
+
+    BackHandler {
+        ttsManager.stop()
+        onClose()
+    }
 
     val sharedPrefs = remember(context) {
         context.getSharedPreferences(READER_PREFS, Context.MODE_PRIVATE)
@@ -189,29 +246,36 @@ fun NativePericopeReader(
         // Górny pasek narzędziowy czytnika
         TopAppBar(
             title = {
+                val shortBookTitle = remember(session.bookCode, session.chapter, session.passageLabel) {
+                    if (session.passageLabel.startsWith(session.bookCode)) {
+                        session.passageLabel
+                    } else {
+                        "${session.bookCode} ${session.chapter}"
+                    }
+                }
                 Column {
                     Text(
-                        text = session.passageLabel,
+                        text = shortBookTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    val daySubtitle = if (session.totalPassages > 1) {
-                        "${session.source.shortLabel} • Dzień ${session.dayNumber} (fragment ${session.passageIndex + 1} z ${session.totalPassages})"
-                    } else {
-                        "${session.source.shortLabel} • Dzień ${session.dayNumber}"
-                    }
                     Text(
-                        text = daySubtitle,
+                        text = "Dzień ${session.dayNumber}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             },
             navigationIcon = {
                 IconButton(
-                    onClick = onClose,
+                    onClick = {
+                        ttsManager.stop()
+                        onClose()
+                    },
                     modifier = Modifier.testTag("reader_back_button")
                 ) {
                     Icon(
@@ -338,9 +402,54 @@ fun NativePericopeReader(
                     )
                 }
 
+                // Ulubione (serduszko)
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.testTag("reader_favorite_button")
+                ) {
+                    Icon(
+                        imageVector = if (session.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (session.isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych",
+                        tint = if (session.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Odtwarzanie lektora (wbudowany Android TTS)
+                IconButton(
+                    onClick = {
+                        val reading = readingState
+                        if (reading != null) {
+                            ttsManager.togglePlayPause(reading)
+                        }
+                    },
+                    enabled = readingState != null && !isLoading && !hasError,
+                    modifier = Modifier.testTag("reader_tts_button")
+                ) {
+                    Icon(
+                        imageVector = when (ttsPlaybackState) {
+                            TtsPlaybackState.PLAYING -> Icons.Default.PauseCircle
+                            TtsPlaybackState.PAUSED -> Icons.Default.PlayCircle
+                            else -> Icons.AutoMirrored.Filled.VolumeUp
+                        },
+                        contentDescription = when (ttsPlaybackState) {
+                            TtsPlaybackState.PLAYING -> "Wstrzymaj lektora"
+                            TtsPlaybackState.PAUSED -> "Wznów lektora"
+                            else -> "Odtwórz na głos (wbudowany lektor Android)"
+                        },
+                        tint = if (ttsPlaybackState == TtsPlaybackState.PLAYING) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    )
+                }
+
                 // Opcja otwarcia w klasycznym widoku WebView
                 IconButton(
-                    onClick = onSwitchToWebView,
+                    onClick = {
+                        ttsManager.stop()
+                        onSwitchToWebView()
+                    },
                     modifier = Modifier.testTag("reader_switch_webview_button")
                 ) {
                     Icon(
@@ -354,6 +463,96 @@ fun NativePericopeReader(
                 containerColor = MaterialTheme.colorScheme.surface
             )
         )
+
+        // Pasek kontrolny odtwarzacza lektora TTS
+        AnimatedVisibility(
+            visible = ttsPlaybackState == TtsPlaybackState.PLAYING || ttsPlaybackState == TtsPlaybackState.PAUSED
+        ) {
+            Surface(
+                color = if (isDarkTheme) Color(0xFF26201D) else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.85f),
+                tonalElevation = 3.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("reader_tts_player_bar")
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = if (ttsPlaybackState == TtsPlaybackState.PLAYING) Icons.AutoMirrored.Filled.VolumeUp else Icons.Default.Pause,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = if (ttsPlaybackState == TtsPlaybackState.PLAYING) "Odtwarzanie lektora" else "Lektor wstrzymany",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Przełącznik prędkości
+                        TextButton(
+                            onClick = { ttsManager.cycleSpeechRate() },
+                            modifier = Modifier.testTag("reader_tts_speed_button")
+                        ) {
+                            Text(
+                                text = "${ttsSpeechRate}x",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        // Pauza / Wznów
+                        IconButton(
+                            onClick = {
+                                val reading = readingState
+                                if (reading != null) {
+                                    ttsManager.togglePlayPause(reading)
+                                }
+                            },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("reader_tts_pause_resume_button")
+                        ) {
+                            Icon(
+                                imageVector = if (ttsPlaybackState == TtsPlaybackState.PLAYING) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (ttsPlaybackState == TtsPlaybackState.PLAYING) "Pauza" else "Odtwórz",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        // Stop
+                        IconButton(
+                            onClick = { ttsManager.stop() },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .testTag("reader_tts_stop_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = "Zatrzymaj lektora",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // Główny obszar czytnika
         Box(
@@ -481,7 +680,44 @@ fun NativePericopeReader(
                                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                                 modifier = Modifier
                                     .widthIn(max = 240.dp)
-                                    .padding(bottom = 20.dp)
+                                    .padding(bottom = 14.dp)
+                            )
+
+                            // Przycisk odsłuchania na głos (wbudowany lektor Android)
+                            AssistChip(
+                                onClick = { ttsManager.togglePlayPause(reading) },
+                                label = {
+                                    Text(
+                                        text = when (ttsPlaybackState) {
+                                            TtsPlaybackState.PLAYING -> "Wstrzymaj lektora"
+                                            TtsPlaybackState.PAUSED -> "Wznów lektora"
+                                            else -> "Odsłuchaj fragment (Lektor)"
+                                        },
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when (ttsPlaybackState) {
+                                            TtsPlaybackState.PLAYING -> Icons.Default.Pause
+                                            TtsPlaybackState.PAUSED -> Icons.Default.PlayArrow
+                                            else -> Icons.AutoMirrored.Filled.VolumeUp
+                                        },
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp),
+                                        tint = if (ttsPlaybackState == TtsPlaybackState.PLAYING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (ttsPlaybackState == TtsPlaybackState.PLAYING) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                    }
+                                ),
+                                modifier = Modifier
+                                    .padding(bottom = 16.dp)
+                                    .testTag("reader_header_tts_chip")
                             )
                         }
 
@@ -517,7 +753,10 @@ fun NativePericopeReader(
 
                                     val nextLabel = session.nextPassageLabel ?: "kolejnego fragmentu"
                                     FilledTonalButton(
-                                        onClick = onNextPassageAndMarkCompleted,
+                                        onClick = {
+                                            ttsManager.stop()
+                                            onNextPassageAndMarkCompleted()
+                                        },
                                         modifier = Modifier
                                             .padding(bottom = 14.dp)
                                             .testTag("reader_next_fragment_button")
@@ -614,7 +853,10 @@ fun NativePericopeReader(
             ) {
                 // Przycisk poprzedniej lektury
                 FilledTonalIconButton(
-                    onClick = onPrevPassage,
+                    onClick = {
+                        ttsManager.stop()
+                        onPrevPassage()
+                    },
                     enabled = session.hasPrev,
                     modifier = Modifier
                         .size(48.dp)
@@ -661,7 +903,10 @@ fun NativePericopeReader(
 
                 // Przycisk kolejnej lektury
                 FilledTonalIconButton(
-                    onClick = onNextPassage,
+                    onClick = {
+                        ttsManager.stop()
+                        onNextPassage()
+                    },
                     enabled = session.hasNext,
                     modifier = Modifier
                         .size(48.dp)

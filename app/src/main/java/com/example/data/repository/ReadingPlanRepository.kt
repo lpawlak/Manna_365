@@ -170,4 +170,27 @@ class ReadingPlanRepository(private val readingDao: ReadingDao) {
             1
         }
     }
+
+    suspend fun exportAllData(): Pair<List<UserPlanStateEntity>, List<ReadingProgressEntity>> {
+        val states = readingDao.getAllPlanStatesList()
+        val progress = readingDao.getAllCompletedPassagesList()
+        return states to progress
+    }
+
+    suspend fun importAllData(
+        states: List<UserPlanStateEntity>,
+        progress: List<ReadingProgressEntity>,
+        replaceExisting: Boolean = true
+    ) {
+        if (replaceExisting) {
+            readingDao.clearAllReadingProgress()
+            readingDao.clearAllPlanStates()
+        }
+        if (states.isNotEmpty()) {
+            readingDao.insertAllPlanStates(states)
+        }
+        if (progress.isNotEmpty()) {
+            readingDao.insertAllReadingProgress(progress)
+        }
+    }
 }

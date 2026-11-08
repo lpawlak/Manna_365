@@ -85,7 +85,9 @@ fun BibleApp(
                     onSetBibleSource = { viewModel.setBibleSource(it) },
                     onSwitchToWebView = { viewModel.setReaderMode(native = false) },
                     isDarkTheme = isDarkTheme,
-                    onToggleTheme = { viewModel.toggleThemeMode() }
+                    onToggleTheme = { viewModel.toggleThemeMode() },
+                    onToggleFavorite = { viewModel.toggleFavoriteInReader() },
+                    onRecordReadingTime = { viewModel.recordReadingTime(it) }
                 )
             } else {
                 ReaderScreen(
@@ -97,7 +99,9 @@ fun BibleApp(
                     onSetBibleSource = { viewModel.setBibleSource(it) },
                     onSwitchToNativeReader = { viewModel.setReaderMode(native = true) },
                     isDarkTheme = isDarkTheme,
-                    onToggleTheme = { viewModel.toggleThemeMode() }
+                    onToggleTheme = { viewModel.toggleThemeMode() },
+                    onToggleFavorite = { viewModel.toggleFavoriteInReader() },
+                    onRecordReadingTime = { viewModel.recordReadingTime(it) }
                 )
             }
         } else {
@@ -151,7 +155,8 @@ fun BibleApp(
                                 onPrevDay = { viewModel.previousDay() },
                                 onJumpToToday = { viewModel.jumpToToday() },
                                 onMarkDayCompleted = { viewModel.markDayCompleted() },
-                                onNavigateToPlans = { viewModel.selectTab(AppNavTab.PLANS) }
+                                onNavigateToPlans = { viewModel.selectTab(AppNavTab.PLANS) },
+                                onToggleFavorite = { viewModel.toggleFavoritePassage(it) }
                             )
                         }
 
@@ -165,7 +170,9 @@ fun BibleApp(
 
                         AppNavTab.PROGRESS -> {
                             ProgressScreen(
-                                uiState = uiState
+                                uiState = uiState,
+                                onOpenReader = { passage, day -> viewModel.openReader(passage, day) },
+                                onToggleFavorite = { viewModel.toggleFavoritePassage(it) }
                             )
                         }
 
@@ -175,7 +182,9 @@ fun BibleApp(
                                 onUpdateReminder = { enabled, h, m -> viewModel.updateReminder(enabled, h, m) },
                                 onResetPlan = { viewModel.resetPlan() },
                                 onSetBibleSource = { viewModel.setBibleSource(it) },
-                                onSetThemeMode = { viewModel.setThemeMode(it) }
+                                onSetThemeMode = { viewModel.setThemeMode(it) },
+                                onExportBackup = { viewModel.createBackupJson() },
+                                onImportBackup = { viewModel.restoreBackupFromJson(it) }
                             )
                         }
                     }

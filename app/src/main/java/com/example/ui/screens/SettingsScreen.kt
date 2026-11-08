@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.FilterChip
@@ -76,6 +77,7 @@ import androidx.compose.material.icons.outlined.Circle
 import com.example.model.BibleSource
 import com.example.service.auth.PismoswieteAuthManager
 import com.example.service.pericope.BibleExtractionEngine
+import com.example.ui.components.FeedbackDialog
 import com.example.ui.components.PismoswieteLoginSheet
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudDownload
@@ -111,6 +113,7 @@ fun SettingsScreen(
     var showResetDialog by remember { mutableStateOf(false) }
     var showTimeDialog by remember { mutableStateOf(false) }
     var showPismoswieteLogin by remember { mutableStateOf(false) }
+    var showFeedbackDialog by remember { mutableStateOf(false) }
     var loginStateTrigger by remember { mutableIntStateOf(0) }
 
     var backupStatusMessage by remember { mutableStateOf<String?>(null) }
@@ -847,6 +850,63 @@ fun SettingsScreen(
             }
         }
 
+        // Contact and Feedback section (Firebase database submission)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("contact_feedback_card"),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Email,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Kontakt z autorem i pomoc",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Zgłoś błąd, zaproponuj funkcję lub zadaj pytanie",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Masz sugestię nowej funkcji, zauważyłeś błąd w tekście lub chcesz skontaktować się z autorem? Wypełnij prosty formularz — zgłoszenie zostanie bezpiecznie zapisane w bazie danych wraz z parametrami technicznymi urządzenia ułatwiającymi diagnozę.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = { showFeedbackDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_feedback_button")
+                    ) {
+                        Icon(Icons.Default.Email, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Otwórz formularz kontaktowy")
+                    }
+                }
+            }
+        }
+
         // Reset plan section
         item {
             Card(
@@ -1060,6 +1120,13 @@ fun SettingsScreen(
                     Text("Anuluj")
                 }
             }
+        )
+    }
+
+    if (showFeedbackDialog) {
+        FeedbackDialog(
+            preferredBibleSourceTitle = uiState.selectedBibleSource.title,
+            onDismiss = { showFeedbackDialog = false }
         )
     }
 

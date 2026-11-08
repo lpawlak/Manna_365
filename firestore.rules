@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidFeedback(data) {
+      return data.category is string &&
+             (data.category == 'BUG' || data.category == 'SUGGESTION' || data.category == 'QUESTION' || data.category == 'OTHER') &&
+             data.message is string &&
+             data.message.size() >= 3 &&
+             data.message.size() <= 4000 &&
+             (!('contactEmail' in data) || data.contactEmail == null || (data.contactEmail is string && data.contactEmail.size() <= 200)) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.deviceInfo is map &&
+             data.deviceInfo.osVersion is string &&
+             data.deviceInfo.osVersion.size() <= 100 &&
+             data.deviceInfo.model is string &&
+             data.deviceInfo.model.size() <= 100;
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Feedback collection: Anyone can create a valid feedback document (app contact form).
+    // Updates and deletions are forbidden from the client to prevent tampering.
+    // Client reading is forbidden to protect user submissions / privacy.
+    match /feedback/{feedbackId} {
+      allow get, list, update, delete: if false;
+
+      allow create: if isValidId(feedbackId) &&
+                       incoming().keys().hasAll(['category', 'message', 'createdAt', 'deviceInfo']) &&
+                       incoming().keys().hasOnly(['category', 'message', 'contactEmail', 'createdAt', 'deviceInfo']) &&
+                       isValidFeedback(incoming());
+    }
+  }
+}

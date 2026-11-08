@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "Feedback": {
+      "title": "Feedback",
+      "description": "User feedback, bug report, or feature suggestion for the app author, including device diagnostics without sensitive user info.",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": ["BUG", "SUGGESTION", "QUESTION", "OTHER"],
+          "description": "Category of feedback: BUG (Zgłoszenie błędu), SUGGESTION (Propozycja funkcji), QUESTION (Pytanie do autora), OTHER (Inne)"
+        },
+        "message": {
+          "type": "string",
+          "description": "User feedback message content (1-4000 characters)"
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "Optional contact email provided by the user"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of feedback submission"
+        },
+        "deviceInfo": {
+          "type": "object",
+          "description": "Basic hardware and OS information gathered without user permissions",
+          "properties": {
+            "osVersion": { "type": "string" },
+            "sdkInt": { "type": "number" },
+            "manufacturer": { "type": "string" },
+            "model": { "type": "string" },
+            "device": { "type": "string" },
+            "appVersion": { "type": "string" },
+            "appVersionCode": { "type": "number" },
+            "networkType": { "type": "string" },
+            "screenDensity": { "type": "string" },
+            "preferredBibleSource": { "type": "string" }
+          }
+        }
+      },
+      "required": ["category", "message", "createdAt", "deviceInfo"]
+    }
+  },
+  "firestore": {
+    "/feedback/{feedbackId}": {
+      "schema": {
+        "$ref": "#/entities/Feedback"
+      },
+      "description": "Submissions from the in-app contact form for bug reports, suggestions, and author inquiries."
+    }
+  }
+}

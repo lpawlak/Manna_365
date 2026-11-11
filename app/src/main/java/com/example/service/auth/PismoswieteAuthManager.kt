@@ -8,25 +8,30 @@ object PismoswieteAuthManager {
     private const val PREFS_NAME = "pismoswiete_auth_prefs"
     private const val KEY_COOKIES = "pismoswiete_cookies"
     private const val KEY_USER_EMAIL = "pismoswiete_user_email"
+    private const val KEY_IS_LOGGED_IN = "pismoswiete_is_logged_in"
 
+    /**
+     * Zwraca ciasteczka sesji TYLKO jeśli użytkownik faktycznie przeszedł pomyślne logowanie.
+     * Nigdy nie zwraca ciasteczek gościa (anonimowego PHPSESSID).
+     */
     fun getCookies(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val isLoggedIn = prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+        if (!isLoggedIn) return null
+
         val saved = prefs.getString(KEY_COOKIES, null)
         if (!saved.isNullOrBlank()) return saved
 
-        return try {
-            val cmCookies = CookieManager.getInstance().getCookie("https://pismoswiete.pl")
-            if (!cmCookies.isNullOrBlank() && cmCookies.contains("PHPSESSID")) {
-                cmCookies
-            } else null
-        } catch (e: Exception) {
-            null
-        }
+        return null
     }
 
+    /**
+     * Zapisuje zweryfikowaną sesję logowania.
+     */
     fun saveCookies(context: Context, cookies: String, email: String? = null) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()
+            .putBoolean(KEY_IS_LOGGED_IN, true)
             .putString(KEY_COOKIES, cookies)
             .apply {
                 if (email != null) putString(KEY_USER_EMAIL, email)
@@ -45,6 +50,9 @@ object PismoswieteAuthManager {
         clearBibleCache(context)
     }
 
+    /**
+     * Całkowicie czyści stan logowania i ciasteczka.
+     */
     fun clearSession(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().clear().apply()
@@ -56,9 +64,16 @@ object PismoswieteAuthManager {
         clearBibleCache(context)
     }
 
+    /**
+     * Prawidłowo weryfikuje czy użytkownik jest zalogowany.
+     * Zwraca true wyłącznie po rzeczywistym, zapisanym zalogowaniu (nie dla anonimowego gościa z PHPSESSID).
+     */
     fun isLoggedIn(context: Context): Boolean {
-        val c = getCookies(context)
-        return !c.isNullOrBlank() && (c.contains("PHPSESSID") || c.contains("REMEMBERME"))
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val hasLoginFlag = prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+        if (!hasLoginFlag) return false
+        val c = prefs.getString(KEY_COOKIES, null)
+        return !c.isNullOrBlank()
     }
 
     fun getUserEmail(context: Context): String? {

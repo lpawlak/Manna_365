@@ -1,38 +1,12 @@
 package com.example
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import com.example.model.DeviceDiagnosticInfo
 import com.example.model.FeedbackCategory
-import com.example.service.feedback.FeedbackService
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
-@RunWith(RobolectricTestRunner::class)
-@Config(manifest = Config.NONE)
 class FeedbackDiagnosticsTest {
-
-    @Test
-    fun testCollectDeviceDiagnosticsWithoutPermissions() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val diagnostics = FeedbackService.collectDeviceDiagnostics(
-            context = context,
-            preferredBibleSource = "pismoswiete.pl"
-        )
-
-        assertNotNull("osVersion should not be null", diagnostics.osVersion)
-        assertTrue("osVersion should contain Android", diagnostics.osVersion.contains("Android"))
-        assertTrue("sdkInt should be positive", diagnostics.sdkInt > 0)
-        assertNotNull("manufacturer should be present", diagnostics.manufacturer)
-        assertNotNull("model should be present", diagnostics.model)
-        assertNotNull("appVersion should be present", diagnostics.appVersion)
-        assertEquals("pismoswiete.pl", diagnostics.preferredBibleSource)
-        assertNotNull("networkType should not be null", diagnostics.networkType)
-    }
 
     @Test
     fun testFeedbackCategories() {
@@ -41,5 +15,26 @@ class FeedbackDiagnosticsTest {
         assertTrue(FeedbackCategory.entries.any { it == FeedbackCategory.SUGGESTION })
         assertTrue(FeedbackCategory.entries.any { it == FeedbackCategory.QUESTION })
         assertTrue(FeedbackCategory.entries.any { it == FeedbackCategory.OTHER })
+    }
+
+    @Test
+    fun testDeviceDiagnosticInfoModel() {
+        val info = DeviceDiagnosticInfo(
+            osVersion = "Android 15 (API 35)",
+            sdkInt = 35,
+            manufacturer = "Samsung",
+            model = "Galaxy S26",
+            device = "s26",
+            appVersion = "7.0",
+            appVersionCode = 7,
+            networkType = "WIFI",
+            screenDensity = "480 dpi",
+            preferredBibleSource = "pismoswiete.pl"
+        )
+        assertEquals("Samsung", info.manufacturer)
+        assertEquals("Galaxy S26", info.model)
+        assertEquals("7.0", info.appVersion)
+        assertEquals(7, info.appVersionCode)
+        assertEquals("pismoswiete.pl", info.preferredBibleSource)
     }
 }

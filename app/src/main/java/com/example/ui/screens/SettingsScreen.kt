@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material.icons.filled.Notifications
@@ -42,12 +44,16 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -164,6 +170,9 @@ fun SettingsScreen(
 
     val isPismoswieteLoggedIn = remember(context, loginStateTrigger) {
         PismoswieteAuthManager.isLoggedIn(context)
+    }
+    val pismoswieteUserEmail = remember(context, loginStateTrigger) {
+        PismoswieteAuthManager.getUserEmail(context)
     }
 
     var selectedHour by remember(uiState.userState.reminderHour) {
@@ -708,7 +717,15 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = if (isPismoswieteLoggedIn) "Zalogowano — pełny dostęp do wszystkich rozdziałów Edycji Św. Pawła" else "Niezalogowany — rozdziały po 1. wymagają logowania (automatycznie używane jest biblia.deon.pl)",
+                                text = if (isPismoswieteLoggedIn) {
+                                    if (!pismoswieteUserEmail.isNullOrBlank()) {
+                                        "Zalogowano ($pismoswieteUserEmail) — pełny dostęp do wszystkich rozdziałów Edycji Św. Pawła"
+                                    } else {
+                                        "Zalogowano — pełny dostęp do wszystkich rozdziałów Edycji Św. Pawła"
+                                    }
+                                } else {
+                                    "Niezalogowany — bezpłatna rejestracja/logowanie w pismoswiete.pl odblokowuje wszystkie rozdziały Edycji Św. Pawła (domyślnie używane jest biblia.deon.pl)"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1003,49 +1020,118 @@ fun SettingsScreen(
         )
     }
 
-    // Time Picker Simple Selection Dialog
+    // Material 3 Time Picker Dialog pozwalający na dowolny wybór godziny i minuty
     if (showTimeDialog) {
+        val timePickerState = rememberTimePickerState(
+            initialHour = selectedHour,
+            initialMinute = selectedMinute,
+            is24Hour = true
+        )
+        var isKeyboardMode by remember { mutableStateOf(false) }
+
         AlertDialog(
             onDismissRequest = { showTimeDialog = false },
-            title = { Text("Wybierz porę przypomnienia") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val quickTimes = listOf(
-                        Pair(7, 0) to "07:00 (Rano)",
-                        Pair(8, 0) to "08:00 (Rano)",
-                        Pair(12, 0) to "12:00 (Południe)",
-                        Pair(19, 0) to "19:00 (Wieczór)",
-                        Pair(21, 0) to "21:00 (Przed snem)"
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Pora przypomnienia",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
-                    quickTimes.forEach { (time, label) ->
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (selectedHour == time.first && selectedMinute == time.second) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            },
-                            onClick = {
-                                selectedHour = time.first
-                                selectedMinute = time.second
-                                onUpdateReminder(true, time.first, time.second)
-                                showTimeDialog = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(14.dp)
+                    IconButton(
+                        onClick = { isKeyboardMode = !isKeyboardMode },
+                        modifier = Modifier.testTag("toggle_time_input_mode_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isKeyboardMode) Icons.Default.Schedule else Icons.Default.Keyboard,
+                            contentDescription = if (isKeyboardMode) "Tryb tarczy zegara" else "Tryb klawiatury",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (isKeyboardMode) {
+                        TimeInput(
+                            state = timePickerState,
+                            modifier = Modifier.testTag("reminder_time_input")
+                        )
+                    } else {
+                        TimePicker(
+                            state = timePickerState,
+                            modifier = Modifier.testTag("reminder_time_picker")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Szybki wybór:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val quickTimes = listOf(
+                            Pair(6, 30) to "06:30",
+                            Pair(7, 0) to "07:00",
+                            Pair(8, 0) to "08:00",
+                            Pair(12, 0) to "12:00",
+                            Pair(19, 0) to "19:00",
+                            Pair(21, 0) to "21:00"
+                        )
+                        quickTimes.forEach { (time, label) ->
+                            val isSelected = timePickerState.hour == time.first && timePickerState.minute == time.second
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = {
+                                    selectedHour = time.first
+                                    selectedMinute = time.second
+                                    onUpdateReminder(true, time.first, time.second)
+                                    showTimeDialog = false
+                                },
+                                label = { Text(label) }
                             )
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showTimeDialog = false }) {
-                    Text("Zamknij")
+                Button(
+                    onClick = {
+                        val h = timePickerState.hour
+                        val m = timePickerState.minute
+                        selectedHour = h
+                        selectedMinute = m
+                        onUpdateReminder(true, h, m)
+                        showTimeDialog = false
+                    },
+                    modifier = Modifier.testTag("reminder_time_confirm_button")
+                ) {
+                    Text("Zapisz")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showTimeDialog = false },
+                    modifier = Modifier.testTag("reminder_time_cancel_button")
+                ) {
+                    Text("Anuluj")
                 }
             }
         )

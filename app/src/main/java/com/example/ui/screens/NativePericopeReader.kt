@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Pause
@@ -96,6 +97,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.border
+import androidx.compose.ui.text.font.FontFamily
+import com.example.ui.theme.LiterataFontFamily
+import com.example.ui.theme.LoraFontFamily
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
@@ -122,6 +127,8 @@ import kotlinx.coroutines.isActive
 private const val READER_PREFS = "reader_settings"
 private const val KEY_FONT_SIZE_SP = "native_reader_font_size"
 private const val DEFAULT_FONT_SIZE = 18
+private const val KEY_FONT_FAMILY = "native_reader_font_family"
+private const val DEFAULT_FONT_FAMILY = "literata"
 
 private val LightPaperColor = Color(0xFFFCFBF9)
 private val DarkPaperColor = Color(0xFF161311)
@@ -193,8 +200,24 @@ fun NativePericopeReader(
     var fontSizeSp by remember {
         mutableIntStateOf(sharedPrefs.getInt(KEY_FONT_SIZE_SP, DEFAULT_FONT_SIZE))
     }
+    var fontFamilyChoice by remember {
+        mutableStateOf(sharedPrefs.getString(KEY_FONT_FAMILY, DEFAULT_FONT_FAMILY) ?: DEFAULT_FONT_FAMILY)
+    }
+
+    fun updateFontFamily(family: String) {
+        fontFamilyChoice = family
+        sharedPrefs.edit().putString(KEY_FONT_FAMILY, family).apply()
+    }
+
+    val currentFontFamily = when (fontFamilyChoice) {
+        "lora" -> LoraFontFamily
+        "system" -> FontFamily.Default
+        else -> LiterataFontFamily
+    }
+
     var showFontSizeSheet by remember { mutableStateOf(false) }
     var showSourceMenu by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
     var showPismoswieteLogin by remember { mutableStateOf(false) }
     var reloadKey by remember { mutableIntStateOf(0) }
 
@@ -232,8 +255,8 @@ fun NativePericopeReader(
         }
     }
 
-    val paperColor = if (isDarkTheme) DarkPaperColor else LightPaperColor
-    val textColor = if (isDarkTheme) Color(0xFFECE0DB) else Color(0xFF212529)
+    val paperColor = if (isDarkTheme) Color(0xFF141210) else LightPaperColor
+    val textColor = if (isDarkTheme) Color(0xFFF5EBE6) else Color(0xFF212529)
 
     Column(
         modifier = modifier
@@ -253,7 +276,9 @@ fun NativePericopeReader(
                         "${session.bookCode} ${session.chapter}"
                     }
                 }
-                Column {
+                Column(
+                    modifier = Modifier.clickable { showSourceMenu = true }
+                ) {
                     Text(
                         text = shortBookTitle,
                         style = MaterialTheme.typography.titleMedium,
@@ -262,9 +287,10 @@ fun NativePericopeReader(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Dzień ${session.dayNumber}",
+                        text = "${session.source.shortLabel} ▾ • Dzień ${session.dayNumber}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -285,19 +311,161 @@ fun NativePericopeReader(
                 }
             },
             actions = {
-                // Menu wyboru źródła (pismoswiete.pl / deon.pl)
+                // Odtwarzanie lektora (wbudowany Android TTS)
+                IconButton(
+                    onClick = {
+                        val reading = readingState
+                        if (reading != null) {
+                            ttsManager.togglePlayPause(reading)
+                        }
+                    },
+                    enabled = readingState != null && !isLoading && !hasError,
+                    modifier = Modifier.testTag("reader_tts_button")
+                ) {
+                    Icon(
+                        imageVector = when (ttsPlaybackState) {
+                            TtsPlaybackState.PLAYING -> Icons.Default.PauseCircle
+                            TtsPlaybackState.PAUSED -> Icons.Default.PlayCircle
+                            else -> Icons.AutoMirrored.Filled.VolumeUp
+                        },
+                        contentDescription = when (ttsPlaybackState) {
+                            TtsPlaybackState.PLAYING -> "Wstrzymaj lektora"
+                            TtsPlaybackState.PAUSED -> "Wznów lektora"
+                            else -> "Odtwórz na głos (wbudowany lektor Android)"
+                        },
+                        tint = if (ttsPlaybackState == TtsPlaybackState.PLAYING) {
+                            MaterialTheme.colorScheme.tertiary
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    )
+                }
+
+                // Regulacja rozmiaru i kroju czcionki
+                IconButton(
+                    onClick = { showFontSizeSheet = true },
+                    modifier = Modifier.testTag("reader_font_size_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FormatSize,
+                        contentDescription = "Rozmiar tekstu ($fontSizeSp sp)",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Przełącznik trybu ciemnego/jasnego
+                IconButton(
+                    onClick = onToggleTheme,
+                    modifier = Modifier.testTag("reader_theme_toggle_button")
+                ) {
+                    Icon(
+                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = if (isDarkTheme) "Włącz tryb jasny" else "Włącz tryb ciemny",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Menu Więcej (Overflow)
                 Box {
                     IconButton(
-                        onClick = { showSourceMenu = true },
-                        modifier = Modifier.testTag("reader_switch_source_button")
+                        onClick = { showMoreMenu = true },
+                        modifier = Modifier.testTag("reader_more_menu_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.SwapHoriz,
-                            contentDescription = "Zmień źródło Biblii",
-                            tint = MaterialTheme.colorScheme.primary
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Więcej opcji"
                         )
                     }
 
+                    DropdownMenu(
+                        expanded = showMoreMenu,
+                        onDismissRequest = { showMoreMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Zmień źródło Biblii (${session.source.shortLabel})") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.SwapHoriz,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                showSourceMenu = true
+                            },
+                            modifier = Modifier.testTag("reader_switch_source_button")
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    Text(
+                                        text = if (isPismoswieteLoggedIn) "Konto pismoswiete.pl" else "Zaloguj do pismoswiete.pl",
+                                        fontWeight = FontWeight.Medium,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Text(
+                                        text = if (isPismoswieteLoggedIn) "Zalogowano • Kliknij, aby wylogować" else "Odblokuj wszystkie rozdziały",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (isPismoswieteLoggedIn) Icons.Default.CheckCircle else Icons.Default.AccountCircle,
+                                    contentDescription = null,
+                                    tint = if (isPismoswieteLoggedIn) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                if (isPismoswieteLoggedIn) {
+                                    PismoswieteAuthManager.clearSession(context)
+                                    BibleExtractionEngine.clearCache(context)
+                                    reloadKey++
+                                } else {
+                                    showPismoswieteLogin = true
+                                }
+                            },
+                            modifier = Modifier.testTag("reader_pismoswiete_auth_menu_item")
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text(if (session.isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (session.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (session.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                onToggleFavorite()
+                            },
+                            modifier = Modifier.testTag("reader_favorite_button")
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Przełącz na widok WWW (WebView)") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Language,
+                                    contentDescription = null
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                ttsManager.stop()
+                                onSwitchToWebView()
+                            },
+                            modifier = Modifier.testTag("reader_switch_webview_button")
+                        )
+                    }
+
+                    // Menu wyboru źródła (pismoswiete.pl / deon.pl)
                     DropdownMenu(
                         expanded = showSourceMenu,
                         onDismissRequest = { showSourceMenu = false },
@@ -335,128 +503,11 @@ fun NativePericopeReader(
                                     if (source != session.source) {
                                         onSetBibleSource(source)
                                     }
-                                }
+                                },
+                                modifier = Modifier.testTag("reader_source_option_${source.id}")
                             )
                         }
-
-                        HorizontalDivider()
-
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Text(
-                                        text = if (isPismoswieteLoggedIn) "Konto pismoswiete.pl" else "Zaloguj do pismoswiete.pl",
-                                        fontWeight = FontWeight.Medium,
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    Text(
-                                        text = if (isPismoswieteLoggedIn) "Zalogowano • Kliknij, aby wylogować" else "Odblokuj wszystkie rozdziały",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = if (isPismoswieteLoggedIn) Icons.Default.CheckCircle else Icons.Default.AccountCircle,
-                                    contentDescription = null,
-                                    tint = if (isPismoswieteLoggedIn) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
-                                )
-                            },
-                            onClick = {
-                                showSourceMenu = false
-                                if (isPismoswieteLoggedIn) {
-                                    PismoswieteAuthManager.clearSession(context)
-                                    BibleExtractionEngine.clearCache(context)
-                                    reloadKey++
-                                } else {
-                                    showPismoswieteLogin = true
-                                }
-                            },
-                            modifier = Modifier.testTag("reader_pismoswiete_auth_menu_item")
-                        )
                     }
-                }
-
-                // Przełącznik trybu ciemnego/jasnego
-                IconButton(
-                    onClick = onToggleTheme,
-                    modifier = Modifier.testTag("reader_theme_toggle_button")
-                ) {
-                    Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = if (isDarkTheme) "Włącz tryb jasny" else "Włącz tryb ciemny",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Regulacja rozmiaru czcionki
-                IconButton(
-                    onClick = { showFontSizeSheet = true },
-                    modifier = Modifier.testTag("reader_font_size_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FormatSize,
-                        contentDescription = "Rozmiar tekstu ($fontSizeSp sp)",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Ulubione (serduszko)
-                IconButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.testTag("reader_favorite_button")
-                ) {
-                    Icon(
-                        imageVector = if (session.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = if (session.isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych",
-                        tint = if (session.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Odtwarzanie lektora (wbudowany Android TTS)
-                IconButton(
-                    onClick = {
-                        val reading = readingState
-                        if (reading != null) {
-                            ttsManager.togglePlayPause(reading)
-                        }
-                    },
-                    enabled = readingState != null && !isLoading && !hasError,
-                    modifier = Modifier.testTag("reader_tts_button")
-                ) {
-                    Icon(
-                        imageVector = when (ttsPlaybackState) {
-                            TtsPlaybackState.PLAYING -> Icons.Default.PauseCircle
-                            TtsPlaybackState.PAUSED -> Icons.Default.PlayCircle
-                            else -> Icons.AutoMirrored.Filled.VolumeUp
-                        },
-                        contentDescription = when (ttsPlaybackState) {
-                            TtsPlaybackState.PLAYING -> "Wstrzymaj lektora"
-                            TtsPlaybackState.PAUSED -> "Wznów lektora"
-                            else -> "Odtwórz na głos (wbudowany lektor Android)"
-                        },
-                        tint = if (ttsPlaybackState == TtsPlaybackState.PLAYING) {
-                            MaterialTheme.colorScheme.tertiary
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        }
-                    )
-                }
-
-                // Opcja otwarcia w klasycznym widoku WebView
-                IconButton(
-                    onClick = {
-                        ttsManager.stop()
-                        onSwitchToWebView()
-                    },
-                    modifier = Modifier.testTag("reader_switch_webview_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Language,
-                        contentDescription = "Przełącz na widok strony WWW (WebView)",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -665,9 +716,10 @@ fun NativePericopeReader(
                             }
                             Text(
                                 text = reading.bookName,
+                                fontFamily = currentFontFamily,
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (isDarkTheme) Color(0xFFF3BD80) else MaterialTheme.colorScheme.primary,
+                                color = if (isDarkTheme) Color(0xFFFFE082) else MaterialTheme.colorScheme.primary,
                                 textAlign = TextAlign.Center
                             )
                             Text(
@@ -727,6 +779,7 @@ fun NativePericopeReader(
                                 section = section,
                                 showChapterHeader = reading.sections.size > 1,
                                 fontSizeSp = fontSizeSp,
+                                fontFamily = currentFontFamily,
                                 textColor = textColor,
                                 isDarkTheme = isDarkTheme,
                                 onOpenLogin = { showPismoswieteLogin = true }
@@ -1043,6 +1096,86 @@ fun NativePericopeReader(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(18.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Krój czcionki lektury",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Wybierz czcionkę zoptymalizowaną do czytania Pisma Świętego",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val fontOptions = listOf(
+                        "literata" to "Literata (Książkowa)",
+                        "lora" to "Lora (Klasyczna)",
+                        "system" to "Systemowa"
+                    )
+                    fontOptions.forEach { (key, name) ->
+                        FilterChip(
+                            selected = fontFamilyChoice == key,
+                            onClick = { updateFontFamily(key) },
+                            label = {
+                                Text(
+                                    text = name,
+                                    fontFamily = when (key) {
+                                        "lora" -> LoraFontFamily
+                                        "system" -> FontFamily.Default
+                                        else -> LiterataFontFamily
+                                    },
+                                    fontWeight = if (fontFamilyChoice == key) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier.testTag("font_choice_$key")
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Podgląd na żywo
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isDarkTheme) Color(0xFF201B18) else Color(0xFFF9F7F4)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Podgląd tekstu lektury:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "¹ Na początku Bóg stworzył niebo i ziemię. ² Ziemia zaś była bezładem i pustką...",
+                            fontFamily = currentFontFamily,
+                            fontSize = fontSizeSp.sp,
+                            lineHeight = (fontSizeSp * 1.7f).sp,
+                            color = textColor
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
@@ -1061,6 +1194,7 @@ private fun SectionContent(
     section: PericopeSection,
     showChapterHeader: Boolean,
     fontSizeSp: Int,
+    fontFamily: FontFamily,
     textColor: Color,
     isDarkTheme: Boolean,
     onOpenLogin: () -> Unit
@@ -1134,9 +1268,10 @@ private fun SectionContent(
                 HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
                 Text(
                     text = "Rozdział ${section.chapter}",
+                    fontFamily = fontFamily,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDarkTheme) Color(0xFFF3BD80) else MaterialTheme.colorScheme.primary,
+                    color = if (isDarkTheme) Color(0xFFFFE082) else MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
                 HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
@@ -1147,10 +1282,11 @@ private fun SectionContent(
         if (!section.sectionTitle.isNullOrBlank()) {
             Text(
                 text = section.sectionTitle,
+                fontFamily = fontFamily,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 fontStyle = FontStyle.Italic,
-                color = if (isDarkTheme) Color(0xFFD36868) else Color(0xFF0D47A1),
+                color = if (isDarkTheme) Color(0xFFFFAB91) else Color(0xFF0D47A1),
                 modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
             )
         }
@@ -1161,10 +1297,11 @@ private fun SectionContent(
                 // Numer wersetu w indeksie górnym z akcentem
                 withStyle(
                     SpanStyle(
+                        fontFamily = fontFamily,
                         fontSize = (fontSizeSp * 0.72f).sp,
                         baselineShift = BaselineShift.Superscript,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDarkTheme) Color(0xFFF3BD80) else Color(0xFF1565C0)
+                        color = if (isDarkTheme) Color(0xFFFFB74D) else Color(0xFF1565C0)
                     )
                 ) {
                     append("${verse.verseNumber} ")
@@ -1172,6 +1309,7 @@ private fun SectionContent(
                 // Treść wersetu
                 withStyle(
                     SpanStyle(
+                        fontFamily = fontFamily,
                         fontSize = fontSizeSp.sp,
                         color = textColor
                     )
@@ -1184,6 +1322,7 @@ private fun SectionContent(
 
         Text(
             text = annotatedVerses,
+            fontFamily = fontFamily,
             lineHeight = (fontSizeSp * 1.75f).sp,
             modifier = Modifier.fillMaxWidth()
         )

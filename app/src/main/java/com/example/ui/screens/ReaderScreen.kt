@@ -17,6 +17,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,6 +98,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.DropdownMenu
@@ -112,11 +114,13 @@ private val LightPaperColor = Color(0xFFFCFBF9)
 private val DarkPaperColor = Color(0xFF161311)
 
 private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
-    val bgColor = if (isDark) "#161311" else "#fcfbf9"
-    val textColor = if (isDark) "#ECE0DB" else "#212529"
-    val primaryColor = if (isDark) "#F3BD80" else "#1565c0"
-    val titleColor = if (isDark) "#D36868" else "#0d47a1"
-    val subtitleColor = if (isDark) "#9E8E89" else "#5f6368"
+    val bgColor = if (isDark) "#141210" else "#fcfbf9"
+    val textColor = if (isDark) "#F5EBE6" else "#212529"
+    val primaryColor = if (isDark) "#FFB74D" else "#1565c0"
+    val titleColor = if (isDark) "#FFE082" else "#0d47a1"
+    val subTitleColor = if (isDark) "#80D8FF" else "#0277bd"
+    val perykopaColor = if (isDark) "#FFAB91" else "#c2185b"
+    val subtitleColor = if (isDark) "#CFD8DC" else "#5f6368"
 
     val js = """
         (function() {
@@ -220,9 +224,10 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                         margin-left: 0 !important;
                     }
                     .preview {
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+                        font-family: 'Literata', 'Lora', Georgia, 'Times New Roman', serif !important;
                         font-size: 1.12rem !important;
                         line-height: 1.8 !important;
+                        letter-spacing: 0.15px !important;
                         color: $textColor !important;
                         background-color: $bgColor !important;
                         max-width: 780px !important;
@@ -249,11 +254,74 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                         font-weight: bold !important;
                         font-size: 0.8em !important;
                     }
-                    .preview .perykopa {
+                    .preview, .preview *, .the-content, .the-content * {
+                        color: $textColor;
+                    }
+                    .preview .sub-title-1,
+                    .preview .sub-title-1 *,
+                    .preview .sub-title-2,
+                    .preview .sub-title-2 *,
+                    .preview .sub-title-3,
+                    .preview .sub-title-3 *,
+                    .preview [class*="sub-title"],
+                    .preview [class*="sub-title"] *,
+                    .sub-title-1,
+                    .sub-title-1 *,
+                    .sub-title-2,
+                    .sub-title-2 *,
+                    .sub-title-3,
+                    .sub-title-3 * {
+                        color: $subTitleColor !important;
+                        font-size: 1.2rem !important;
+                        font-weight: bold !important;
+                        text-align: center !important;
+                        margin: 18px 0 10px !important;
+                        display: block !important;
+                    }
+                    .preview .tome,
+                    .preview .tome *,
+                    .preview .tome-title,
+                    .preview .tome-title *,
+                    .preview .title-tome,
+                    .preview .title-tome *,
+                    .preview .title-chapter,
+                    .preview .title-chapter *,
+                    .preview .chapter-title,
+                    .preview .chapter-title *,
+                    .preview [class*="title"],
+                    .preview [class*="title"] *,
+                    .preview [class*="tome"],
+                    .preview [class*="tome"] *,
+                    .preview h1, .preview h1 *,
+                    .preview h2, .preview h2 *,
+                    .preview h3, .preview h3 *,
+                    .preview h4, .preview h4 *,
+                    .preview h5, .preview h5 *,
+                    .book-label,
+                    .book-label * {
+                        color: $titleColor !important;
+                        text-align: center !important;
+                        font-weight: bold !important;
+                        display: block !important;
+                    }
+                    .preview .perykopa,
+                    .preview .perykopa *,
+                    .perykopa,
+                    .perykopa * {
                         font-size: 1.15em !important;
                         font-weight: bold !important;
-                        color: $titleColor !important;
+                        color: $perykopaColor !important;
                         margin: 16px 0 6px !important;
+                    }
+                    .preview a,
+                    .preview a *,
+                    .the-content a,
+                    .the-content a * {
+                        color: $subTitleColor !important;
+                    }
+                    svg, svg * {
+                        fill: $primaryColor !important;
+                        stroke: $primaryColor !important;
                     }
 
                     /* ========================================================
@@ -320,9 +388,10 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                         margin: 0 auto !important;
                         padding: 12px 16px 80px 16px !important;
                         box-sizing: border-box !important;
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+                        font-family: 'Literata', 'Lora', Georgia, 'Times New Roman', serif !important;
                         font-size: 1.12rem !important;
                         line-height: 1.8 !important;
+                        letter-spacing: 0.15px !important;
                         color: $textColor !important;
                         width: 100% !important;
                     }
@@ -357,7 +426,7 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                     .tytul1, .miedzytytul1, .tytul2 {
                         font-size: 1.18rem !important;
                         font-weight: bold !important;
-                        color: $titleColor !important;
+                        color: $perykopaColor !important;
                         margin: 20px 0 8px !important;
                         display: block !important;
                     }
@@ -485,6 +554,7 @@ fun ReaderScreen(
     }
     var showFontSizeSheet by remember { mutableStateOf(false) }
     var showSourceMenu by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
 
     val currentUrl = remember(session.bookCode, session.chapter, session.source) {
         val passage = ReadingPassage(session.bookCode, session.bookName, session.chapter)
@@ -522,7 +592,9 @@ fun ReaderScreen(
                         "${session.bookCode} ${session.chapter}"
                     }
                 }
-                Column {
+                Column(
+                    modifier = Modifier.clickable { showSourceMenu = true }
+                ) {
                     Text(
                         text = shortBookTitle,
                         style = MaterialTheme.typography.titleMedium,
@@ -531,9 +603,10 @@ fun ReaderScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Dzień ${session.dayNumber}",
+                        text = "${session.source.shortLabel} ▾ • Dzień ${session.dayNumber}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -551,19 +624,125 @@ fun ReaderScreen(
                 }
             },
             actions = {
-                // Source Switcher Menu
+                // Font scaling button
+                IconButton(
+                    onClick = { showFontSizeSheet = true },
+                    modifier = Modifier.testTag("reader_font_size_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FormatSize,
+                        contentDescription = "Rozmiar tekstu ($fontZoom%)",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Theme mode toggle button (Day / Night)
+                IconButton(
+                    onClick = onToggleTheme,
+                    modifier = Modifier.testTag("reader_theme_toggle_button")
+                ) {
+                    Icon(
+                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = if (isDarkTheme) "Włącz tryb jasny" else "Włącz tryb nocny",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // Switch to Native Pericope Reader
+                IconButton(
+                    onClick = onSwitchToNativeReader,
+                    modifier = Modifier.testTag("reader_switch_native_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                        contentDescription = "Przełącz na natywny czytnik perykop",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                // More Options Menu (Overflow)
                 Box {
                     IconButton(
-                        onClick = { showSourceMenu = true },
-                        modifier = Modifier.testTag("reader_switch_source_button")
+                        onClick = { showMoreMenu = true },
+                        modifier = Modifier.testTag("reader_more_menu_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.SwapHoriz,
-                            contentDescription = "Zmień źródło Biblii (${session.source.shortLabel})",
-                            tint = MaterialTheme.colorScheme.primary
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Więcej opcji"
                         )
                     }
 
+                    DropdownMenu(
+                        expanded = showMoreMenu,
+                        onDismissRequest = { showMoreMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Zmień źródło Biblii (${session.source.shortLabel})") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.SwapHoriz,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                showSourceMenu = true
+                            },
+                            modifier = Modifier.testTag("reader_switch_source_button")
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text(if (session.isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = if (session.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (session.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                onToggleFavorite()
+                            },
+                            modifier = Modifier.testTag("reader_favorite_button")
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Odśwież") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                hasError = false
+                                isLoading = true
+                                webViewInstance?.reload()
+                            },
+                            modifier = Modifier.testTag("reader_refresh_button")
+                        )
+
+                        DropdownMenuItem(
+                            text = { Text("Otwórz w przeglądarce") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.OpenInBrowser,
+                                    contentDescription = null
+                                )
+                            },
+                            onClick = {
+                                showMoreMenu = false
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.testTag("reader_open_browser_button")
+                        )
+                    }
+
+                    // Source Selection Dropdown Menu
                     DropdownMenu(
                         expanded = showSourceMenu,
                         onDismissRequest = { showSourceMenu = false },
@@ -606,79 +785,6 @@ fun ReaderScreen(
                             )
                         }
                     }
-                }
-
-                // Theme mode toggle button (Day / Night)
-                IconButton(
-                    onClick = onToggleTheme,
-                    modifier = Modifier.testTag("reader_theme_toggle_button")
-                ) {
-                    Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = if (isDarkTheme) "Włącz tryb jasny" else "Włącz tryb nocny",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Switch to Native Pericope Reader
-                IconButton(
-                    onClick = onSwitchToNativeReader,
-                    modifier = Modifier.testTag("reader_switch_native_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                        contentDescription = "Przełącz na natywny czytnik perykop",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Ulubione (serduszko)
-                IconButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.testTag("reader_favorite_button")
-                ) {
-                    Icon(
-                        imageVector = if (session.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = if (session.isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych",
-                        tint = if (session.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Font scaling button
-                IconButton(
-                    onClick = { showFontSizeSheet = true },
-                    modifier = Modifier.testTag("reader_font_size_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FormatSize,
-                        contentDescription = "Rozmiar tekstu ($fontZoom%)",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        hasError = false
-                        isLoading = true
-                        webViewInstance?.reload()
-                    },
-                    modifier = Modifier.testTag("reader_refresh_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Odśwież"
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentUrl))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.testTag("reader_open_browser_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.OpenInBrowser,
-                        contentDescription = "Otwórz w przeglądarce"
-                    )
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(

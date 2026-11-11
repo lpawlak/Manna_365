@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.ReadingPassage
@@ -303,8 +304,9 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { onOpenReader(passage, uiState.displayedDay) }
                     .testTag("passage_item_${passage.bookCode}_${passage.chapter}"),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (isCompleted) {
                         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -312,18 +314,17 @@ fun HomeScreen(
                         MaterialTheme.colorScheme.surface
                     }
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = if (isCompleted) 0.dp else 1.5.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Book code avatar
+                    // Book code avatar badge
                     Surface(
-                        modifier = Modifier.size(46.dp),
+                        modifier = Modifier.size(42.dp),
                         shape = CircleShape,
                         color = if (isCompleted) {
                             MaterialTheme.colorScheme.tertiaryContainer
@@ -345,16 +346,23 @@ fun HomeScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
-                    // Title & info
-                    Column(modifier = Modifier.weight(1f)) {
+                    // Title & info column - gets weight(1f) and plenty of space
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 4.dp)
+                    ) {
                         Text(
                             text = passage.bookName,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = if (passage.passageLabel.isNotBlank() && !passage.passageLabel.contains("rozdz.")) {
                                 passage.passageLabel
@@ -362,46 +370,31 @@ fun HomeScreen(
                                 "Rozdział ${passage.chapter}"
                             },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    // Favorite button (Heart)
-                    val labelStr = passage.passageLabel.ifBlank { "${passage.bookName}, rozdz. ${passage.chapter}" }
-                    val favKey = "${passage.bookCode}-${passage.chapter}-$labelStr"
-                    val isFavorite = uiState.favoriteKeys.contains(favKey) || uiState.favoritePassages.any { it.bookCode == passage.bookCode && it.chapter == passage.chapter }
-
-                    IconButton(
-                        onClick = { onToggleFavorite(passage) },
-                        modifier = Modifier
-                            .size(40.dp)
-                            .testTag("fav_btn_${passage.bookCode}_${passage.chapter}")
-                    ) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = if (isFavorite) "Usuń z ulubionych" else "Dodaj do ulubionych",
-                            tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    // Read button
+                    // Compact "Czytaj" button
                     FilledTonalButton(
                         onClick = { onOpenReader(passage, uiState.displayedDay) },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.testTag("read_passage_button_${passage.bookCode}_${passage.chapter}")
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.MenuBook,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Czytaj")
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Czytaj",
+                            style = MaterialTheme.typography.labelLarge
+                        )
                     }
 
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
 
                     // Checkbox
                     Checkbox(

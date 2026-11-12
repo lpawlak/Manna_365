@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocalFireDepartment
@@ -36,7 +40,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import com.example.model.ReadingStatsCalculator
+import com.example.model.WeekDayStat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,6 +149,14 @@ fun ProgressScreen(
                     }
                 }
             }
+        }
+
+        // Tygodniowa seria czytania (Weekly Streak Breakdown)
+        item {
+            WeeklyStreakCard(
+                stats = stats,
+                allCompletedReadings = uiState.allCompletedReadings
+            )
         }
 
         // Section: Kluczowe statystyki lektury (2x2 Grid)
@@ -483,6 +501,328 @@ private fun StatCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
+        }
+    }
+}
+
+@Composable
+private fun WeeklyStreakCard(
+    stats: com.example.model.ReadingStats,
+    allCompletedReadings: List<com.example.data.entity.ReadingProgressEntity>,
+    modifier: Modifier = Modifier
+) {
+    var weekOffset by remember { mutableIntStateOf(0) }
+    val isCurrentWeek = (weekOffset == 0)
+
+    val displayedWeek = remember(allCompletedReadings, weekOffset, stats.weeklyBreakdown) {
+        if (weekOffset == 0 && stats.weeklyBreakdown.isNotEmpty()) {
+            stats.weeklyBreakdown
+        } else {
+            ReadingStatsCalculator.calculateWeeklyProgress(allCompletedReadings, weekOffset)
+        }
+    }
+
+    val completedDaysInThisWeek = displayedWeek.count { it.isCompleted }
+    val weekRangeLabel = remember(displayedWeek) {
+        if (displayedWeek.size == 7) {
+            val start = displayedWeek.first()
+            val end = displayedWeek.last()
+            "${start.dayOfMonth} ${start.monthName} – ${end.dayOfMonth} ${end.monthName}"
+        } else ""
+    }
+
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("weekly_streak_card"),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            // Header: Ikona ognia, tytuł oraz odznaka aktualnej serii
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(42.dp),
+                        shape = CircleShape,
+                        color = Color(0xFFFF9800).copy(alpha = 0.15f)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.LocalFireDepartment,
+                                contentDescription = null,
+                                tint = Color(0xFFFF6D00),
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = "Tydzień ze Słowem",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isCurrentWeek) {
+                                "Zaliczono: $completedDaysInThisWeek z 7 dni"
+                            } else {
+                                "Tydzień: $weekRangeLabel ($completedDaysInThisWeek z 7)"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // Odznaka serii (Streak badge)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (stats.isStreakActiveToday) Color(0xFFFF9800).copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.testTag("streak_pill_badge")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = if (stats.isStreakActiveToday) Color(0xFFFF6D00) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "${stats.currentStreakDays} dni",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (stats.isStreakActiveToday) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Przełączanie tygodni (Poprzedni tydzień < > Następny tydzień)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = { weekOffset-- },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("prev_week_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "Poprzedni tydzień",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Text(
+                    text = when {
+                        weekOffset == 0 -> "Bieżący tydzień ($weekRangeLabel)"
+                        weekOffset == -1 -> "Poprzedni tydzień ($weekRangeLabel)"
+                        weekOffset < -1 -> "${-weekOffset} tyg. temu ($weekRangeLabel)"
+                        else -> "Tydzień $weekRangeLabel"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                IconButton(
+                    onClick = { if (weekOffset < 0) weekOffset++ },
+                    enabled = weekOffset < 0,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("next_week_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Następny tydzień",
+                        tint = if (weekOffset < 0) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outlineVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Rząd 7 dni tygodnia (Pon, Wt, Śr, Czw, Pt, Sob, Ndz)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("weekly_streak_days_row"),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                displayedWeek.forEach { day ->
+                    DayStreakItem(
+                        day = day,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Pasek motywacyjny
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = when {
+                    stats.isStreakActiveToday -> Color(0xFFFF9800).copy(alpha = 0.12f)
+                    stats.currentStreakDays > 0 -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("streak_motivation_banner")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = when {
+                            stats.isStreakActiveToday -> "🔥"
+                            stats.currentStreakDays > 0 -> "⏳"
+                            else -> "📖"
+                        },
+                        fontSize = 18.sp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = when {
+                            stats.isStreakActiveToday -> "Świetna passa! Dziś lektura już zaliczona. Masz ${stats.currentStreakDays} dni nieprzerwanej serii!"
+                            stats.currentStreakDays > 0 -> "Nie przerywaj serii! Przeczytaj dzisiejszy fragment, aby utrzymać ${stats.currentStreakDays} dni z rzędu."
+                            else -> "Przeczytaj dzisiejszy fragment Słowa Bożego, aby rozpocząć nową serię czytania!"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayStreakItem(
+    day: WeekDayStat,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Skrót nazwy dnia (np. "Pon")
+        Text(
+            text = day.dayOfWeekName,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (day.isToday) FontWeight.ExtraBold else FontWeight.Medium,
+            color = if (day.isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Dzień miesiąca (np. "12")
+        Text(
+            text = "${day.dayOfMonth}",
+            style = MaterialTheme.typography.bodySmall,
+            fontSize = 11.sp,
+            fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal,
+            color = if (day.isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Wskaźnik stanu czytania w danym dniu
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .then(
+                    when {
+                        day.isCompleted -> Modifier.background(Color(0xFFFF9800))
+                        day.isToday -> Modifier
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                            .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                        day.isFuture -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                        else -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                day.isCompleted -> {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Przeczytano",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                day.isToday -> {
+                    Text(
+                        text = "Dziś",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                day.isFuture -> {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    )
+                }
+                else -> {
+                    Text(
+                        text = "–",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // Etykieta pod kółkiem (np. "✓" lub "2x")
+        if (day.isCompleted) {
+            Text(
+                text = if (day.completedCount > 1) "${day.completedCount}x" else "✓",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFE65100)
+            )
+        } else if (day.isToday) {
+            Text(
+                text = "Czeka",
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
+            Spacer(modifier = Modifier.height(13.dp))
         }
     }
 }

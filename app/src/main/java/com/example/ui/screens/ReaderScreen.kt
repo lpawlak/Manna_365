@@ -847,7 +847,10 @@ fun ReaderScreen(
 
                             builtInZoomControls = true
                             displayZoomControls = false
-                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            // Bezpieczeństwo: blokada nieszyfrowanych zasobów HTTP i dostępu do plików systemowych
+                            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                            allowFileAccess = false
+                            allowContentAccess = false
                         }
 
                         webChromeClient = object : WebChromeClient() {
@@ -863,6 +866,22 @@ fun ReaderScreen(
                         }
 
                         webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                val targetUri = request?.url ?: return false
+                                val host = targetUri.host?.lowercase() ?: ""
+                                val isBibleDomain = host.contains("pismoswiete.pl") || host.contains("deon.pl")
+                                return if (isBibleDomain) {
+                                    false
+                                } else {
+                                    // Zewnętrzne odnośniki otwieramy bezpiecznie w zewnętrznej przeglądarce
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, targetUri)
+                                        ctx.startActivity(intent)
+                                    } catch (ignored: Exception) {}
+                                    true
+                                }
+                            }
+
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 isLoading = true
                                 hasError = false

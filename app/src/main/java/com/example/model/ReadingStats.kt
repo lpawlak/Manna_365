@@ -16,6 +16,18 @@ data class TimeSlotStat(
     val iconEmoji: String
 )
 
+data class WeekDayStat(
+    val dayOfWeekName: String,     // "Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Ndz"
+    val fullDayName: String,       // "Poniedziałek", "Wtorek", etc.
+    val dayOfMonth: Int,           // 9, 10, 11...
+    val monthName: String,         // "lis"
+    val dateMillis: Long,
+    val isCompleted: Boolean,      // Czy przeczytano choć 1 fragment w tym dniu
+    val completedCount: Int,       // Liczba przeczytanych fragmentów
+    val isToday: Boolean,          // Czy to dzień dzisiejszy
+    val isFuture: Boolean          // Czy to przyszły dzień w tym tygodniu
+)
+
 data class ReadingStats(
     val totalReadingSeconds: Long = 0L,
     val formattedReadingTime: String = "0 min",
@@ -30,7 +42,9 @@ data class ReadingStats(
     val paceDescription: String = "Standardowe tempo (1 dzień/dobę)",
     val isPlanCompleted: Boolean = false,
     val timeSlotBreakdown: List<TimeSlotStat> = emptyList(),
-    val averageSecondsPerReading: Long = 0L
+    val averageSecondsPerReading: Long = 0L,
+    val weeklyBreakdown: List<WeekDayStat> = emptyList(),
+    val weekCompletedDaysCount: Int = 0
 )
 
 object ReadingStatsCalculator {
@@ -182,6 +196,78 @@ object ReadingStatsCalculator {
         return Triple(dateString, remainingCalendarDays.toInt(), subtitle)
     }
 
+    fun calculateWeeklyProgress(
+        readings: List<ReadingProgressEntity>,
+        weekOffset: Int = 0,
+        nowCalendar: Calendar = Calendar.getInstance()
+    ): List<WeekDayStat> {
+        val todayYear = nowCalendar.get(Calendar.YEAR)
+        val todayDayOfYear = nowCalendar.get(Calendar.DAY_OF_YEAR)
+
+        val refCal = (nowCalendar.clone() as Calendar).apply {
+            if (weekOffset != 0) {
+                add(Calendar.WEEK_OF_YEAR, weekOffset)
+            }
+        }
+
+        val dayOfWeek = refCal.get(Calendar.DAY_OF_WEEK)
+        val daysFromMonday = when (dayOfWeek) {
+            Calendar.MONDAY -> 0
+            Calendar.TUESDAY -> 1
+            Calendar.WEDNESDAY -> 2
+            Calendar.THURSDAY -> 3
+            Calendar.FRIDAY -> 4
+            Calendar.SATURDAY -> 5
+            Calendar.SUNDAY -> 6
+            else -> 0
+        }
+
+        val mondayCal = (refCal.clone() as Calendar).apply {
+            add(Calendar.DAY_OF_YEAR, -daysFromMonday)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val dayNamesShort = listOf("Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Ndz")
+        val dayNamesFull = listOf("Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela")
+        val monthNamesShort = listOf("sty", "lut", "mar", "kwi", "maj", "cze", "lip", "sie", "wrz", "paź", "lis", "gru")
+
+        return (0..6).map { i ->
+            val dayCal = (mondayCal.clone() as Calendar).apply {
+                add(Calendar.DAY_OF_YEAR, i)
+            }
+            val y = dayCal.get(Calendar.YEAR)
+            val doy = dayCal.get(Calendar.DAY_OF_YEAR)
+            val dom = dayCal.get(Calendar.DAY_OF_MONTH)
+            val month = dayCal.get(Calendar.MONTH)
+
+            val isToday = (y == todayYear && doy == todayDayOfYear)
+            val isFuture = dayCal.after(nowCalendar) && !isToday
+
+            val completedOnDay = readings.filter { r ->
+                if (r.completedAt <= 0L) false
+                else {
+                    val rCal = Calendar.getInstance().apply { timeInMillis = r.completedAt }
+                    rCal.get(Calendar.YEAR) == y && rCal.get(Calendar.DAY_OF_YEAR) == doy
+                }
+            }
+
+            WeekDayStat(
+                dayOfWeekName = dayNamesShort[i],
+                fullDayName = dayNamesFull[i],
+                dayOfMonth = dom,
+                monthName = monthNamesShort.getOrElse(month) { "" },
+                dateMillis = dayCal.timeInMillis,
+                isCompleted = completedOnDay.isNotEmpty(),
+                completedCount = completedOnDay.size,
+                isToday = isToday,
+                isFuture = isFuture
+            )
+        }
+    }
+
     fun computeStats(
         totalReadingSeconds: Long,
         activePlan: PlanDefinition,
@@ -213,6 +299,9 @@ object ReadingStatsCalculator {
                     now.get(Calendar.DAY_OF_YEAR) == last.get(Calendar.DAY_OF_YEAR)
         }
 
+        val weekly = calculateWeeklyProgress(readings)
+        val weekCompleted = weekly.count { it.isCompleted }
+
         return ReadingStats(
             totalReadingSeconds = totalReadingSeconds,
             formattedReadingTime = formatReadingTime(totalReadingSeconds),
@@ -227,7 +316,9 @@ object ReadingStatsCalculator {
             paceDescription = paceMsg,
             isPlanCompleted = (activePlan.totalDays - userState.currentDay) <= 0,
             timeSlotBreakdown = timeSlots,
-            averageSecondsPerReading = avgSec
+            averageSecondsPerReading = avgSec,
+            weeklyBreakdown = weekly,
+            weekCompletedDaysCount = weekCompleted
         )
     }
 }

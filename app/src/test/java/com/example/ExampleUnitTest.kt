@@ -578,6 +578,41 @@ class ExampleUnitTest {
         assertEquals("J", deserialized[1].bookCode)
         assertEquals("J 3,16-21", deserialized[1].passageLabel)
     }
+
+    @Test
+    fun testWeeklyReadingProgressBreakdown() {
+        val now = java.util.Calendar.getInstance()
+        val readings = listOf(
+            com.example.data.entity.ReadingProgressEntity(
+                planId = "plan_bible_365",
+                dayNumber = 1,
+                bookCode = "Rdz",
+                chapter = 1,
+                isCompleted = true,
+                completedAt = now.timeInMillis
+            )
+        )
+
+        val week = com.example.model.ReadingStatsCalculator.calculateWeeklyProgress(readings, weekOffset = 0, nowCalendar = now)
+        assertEquals(7, week.size)
+        assertEquals("Pon", week[0].dayOfWeekName)
+        assertEquals("Ndz", week[6].dayOfWeekName)
+
+        val todayStat = week.firstOrNull { it.isToday }
+        org.junit.Assert.assertNotNull(todayStat)
+        assertTrue(todayStat!!.isCompleted)
+        assertEquals(1, todayStat.completedCount)
+
+        val stats = com.example.model.ReadingStatsCalculator.computeStats(
+            totalReadingSeconds = 300L,
+            activePlan = com.example.model.BibleData.availablePlans.first(),
+            userState = com.example.data.entity.UserPlanStateEntity(planId = "plan_bible_365", lastReadDateMillis = now.timeInMillis, streakDays = 1),
+            readings = readings,
+            storedMaxStreak = 1
+        )
+        assertEquals(7, stats.weeklyBreakdown.size)
+        assertTrue(stats.weekCompletedDaysCount >= 1)
+    }
 }
 
 

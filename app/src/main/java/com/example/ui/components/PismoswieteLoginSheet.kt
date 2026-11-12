@@ -242,7 +242,10 @@ fun PismoswieteLoginSheet(
                                 userAgentString = standardChromeUa
                                 javaScriptCanOpenWindowsAutomatically = true
                                 setSupportMultipleWindows(true)
-                                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                // Bezpieczeństwo: blokada mixed content i dostępu do lokalnych plików
+                                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                                allowFileAccess = false
+                                allowContentAccess = false
                                 cacheMode = WebSettings.LOAD_DEFAULT
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
@@ -283,8 +286,34 @@ fun PismoswieteLoginSheet(
                                 }
 
                                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                    val targetUri = request?.url ?: return false
+                                    val urlStr = targetUri.toString()
+                                    val host = targetUri.host?.lowercase() ?: ""
                                     canGoBackState = view?.canGoBack() == true
-                                    return false // Obsługuj wszystkie przekierowania w WebView
+
+                                    if (urlStr.startsWith("market://") || host.contains("play.google.com")) {
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, targetUri)
+                                            ctx.startActivity(intent)
+                                        } catch (ignored: Exception) {}
+                                        return true
+                                    }
+
+                                    val isAuthDomain = host.contains("pismoswiete.pl") ||
+                                            host.contains("google.com") ||
+                                            host.contains("gstatic.com") ||
+                                            host.contains("apple.com") ||
+                                            host.contains("facebook.com")
+
+                                    return if (isAuthDomain) {
+                                        false
+                                    } else {
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, targetUri)
+                                            ctx.startActivity(intent)
+                                        } catch (ignored: Exception) {}
+                                        true
+                                    }
                                 }
 
                                 override fun onPageFinished(view: WebView?, url: String?) {

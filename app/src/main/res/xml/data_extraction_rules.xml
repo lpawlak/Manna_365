@@ -4,12 +4,10 @@
         <!-- Automatyczna kopia zapasowa w chmurze Dysku Google -->
         <include domain="database" path="."/>
         <include domain="sharedpref" path="."/>
-        <exclude domain="root" path="cache/"/>
     </cloud-backup>
     <device-transfer>
         <!-- Bezpośrednie przenoszenie danych na nowy telefon -->
         <include domain="database" path="."/>
         <include domain="sharedpref" path="."/>
-        <exclude domain="root" path="cache/"/>
     </device-transfer>
 </data-extraction-rules>

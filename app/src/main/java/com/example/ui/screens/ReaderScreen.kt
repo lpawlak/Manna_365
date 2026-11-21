@@ -191,6 +191,8 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                     .preview .comment,
                     .preview .comment-perykopa,
                     .preview .comment-tome,
+                    .preview .definition-box,
+                    .preview .dictionary-box,
                     .preview a.link,
                     a.link.comment,
                     a.link.definition,
@@ -249,13 +251,33 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                         float: left !important;
                         margin: 2px 6px 0 0 !important;
                     }
-                    .preview .werset-number, .preview sup {
+                    .preview .werset-number,
+                    .preview sup.werset-number,
+                    .preview sup {
                         color: $primaryColor !important;
                         font-weight: bold !important;
-                        font-size: 0.8em !important;
+                        font-size: 0.78em !important;
                     }
                     .preview, .preview *, .the-content, .the-content * {
                         color: $textColor;
+                    }
+                    .preview .werset,
+                    .preview span.werset {
+                        color: $textColor !important;
+                        font-weight: normal !important;
+                        font-size: inherit !important;
+                        margin-right: 0 !important;
+                        display: inline !important;
+                    }
+                    .preview .capitalic,
+                    .preview capitalic,
+                    .capitalic,
+                    capitalic {
+                        color: $textColor !important;
+                        font-weight: inherit !important;
+                        font-size: 0.85em !important;
+                        letter-spacing: 0.4px !important;
+                        text-transform: uppercase !important;
                     }
                     .preview .sub-title-1,
                     .preview .sub-title-1 *,
@@ -263,6 +285,12 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                     .preview .sub-title-2 *,
                     .preview .sub-title-3,
                     .preview .sub-title-3 *,
+                    .preview .srodtytul1,
+                    .preview .srodtytul1 *,
+                    .preview .srodtytul2,
+                    .preview .srodtytul2 *,
+                    .preview .srodtytul3,
+                    .preview .srodtytul3 *,
                     .preview [class*="sub-title"],
                     .preview [class*="sub-title"] *,
                     .sub-title-1,
@@ -440,7 +468,16 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                         margin: 2px 8px 0 0 !important;
                     }
 
-                    .werset, span.werset {
+                    /* biblia.deon.pl używa <span class="werset"> wyłącznie jako numeru wersetu,
+                       podczas gdy pismoswiete.pl owija nim całą treść wersetu (.preview .werset) */
+                    .the-content .werset,
+                    .the-content span.werset,
+                    .tresc .werset,
+                    .tresc span.werset,
+                    #content .werset,
+                    #content span.werset,
+                    .wrap .werset,
+                    .wrap span.werset {
                         color: $primaryColor !important;
                         font-weight: bold !important;
                         font-size: 0.85em !important;
@@ -448,7 +485,7 @@ private fun injectSafeReaderStyles(webView: WebView?, isDark: Boolean = false) {
                         display: inline !important;
                     }
 
-                    sup {
+                    sup, .the-content sup, .tresc sup {
                         color: $primaryColor !important;
                         font-size: 0.75em !important;
                     }

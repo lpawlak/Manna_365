@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Polityka Prywatności — Manna 365</title>
+    <style>
+        :root {
+            --bg: #fffdf8;
+            --surface: #ffffff;
+            --text: #241b17;
+            --muted: #6c5a52;
+            --accent: #c13a21;
+            --accent-soft: #f9ebe6;
+            --gold: #cd7d0e;
+            --border: #eadfd7;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #16110f;
+                --surface: #211916;
+                --text: #f5ebe6;
+                --muted: #bfaea6;
+                --accent: #ff8a65;
+                --accent-soft: #33221d;
+                --gold: #ffb74d;
+                --border: #382b26;
+            }
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.65;
+            padding: 24px 16px 64px;
+        }
+        main {
+            max-width: 780px;
+            margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px 28px;
+        }
+        header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 18px;
+            margin-bottom: 24px;
+        }
+        .badge {
+            display: inline-block;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 10px;
+        }
+        h1 {
+            margin: 0 0 6px;
+            font-size: 1.85rem;
+            line-height: 1.25;
+        }
+        .meta {
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin: 0;
+        }
+        h2 {
+            margin-top: 28px;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            color: var(--accent);
+        }
+        p, li {
+            font-size: 1rem;
+        }
+        ul {
+            padding-left: 20px;
+            margin-top: 8px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .contact-box {
+            margin-top: 28px;
+            padding: 16px 18px;
+            border-radius: 12px;
+            background: var(--accent-soft);
+            border: 1px solid var(--border);
+        }
+        hr.lang-divider {
+            border: none;
+            border-top: 1px dashed var(--border);
+            margin: 40px 0 28px;
+        }
+        footer {
+            max-width: 780px;
+            margin: 18px auto 0;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        @media (max-width: 600px) {
+            main { padding: 22px 18px; }
+            h1 { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <span class="badge">Manna 365 &bull; Android</span>
+            <h1>Polityka Prywatności</h1>
+            <p class="meta">
+                Ostatnia aktualizacja: 21 listopada 2026 r. &bull;
+                Identyfikator aplikacji: <code>com.aistudio.slowonadzien.fzypnt</code>
+            </p>
+        </header>
+
+        <p>
+            Niniejsza Polityka Prywatności wyjaśnia, jakie dane są przetwarzane podczas korzystania z aplikacji mobilnej
+            <strong>Manna 365</strong> (zwanej dalej „Aplikacją”). Twórcą i administratorem Aplikacji jest
+            Łukasz (kontakt: <a href="mailto:lukaszp1985@gmail.com">lukaszp1985@gmail.com</a>).
+        </p>
+
+        <h2>1. Dane przechowywane lokalnie na urządzeniu i kopia zapasowa</h2>
+        <p>
+            Aplikacja nie wymaga zakładania konta i przechowuje dane użytkownika lokalnie w pamięci urządzenia:
+        </p>
+        <ul>
+            <li>postępy w planach czytania Pisma Świętego, przeczytane fragmenty oraz statystyki serii dni,</li>
+            <li>zapisane ulubione fragmenty,</li>
+            <li>ustawienia Aplikacji (wybrany plan, źródło tekstu, motyw kolorystyczny, rozmiar czcionki, godzina przypomnienia).</li>
+        </ul>
+        <p>
+            Dane te mogą być automatycznie archiwizowane przez systemową funkcję <strong>Android Auto Backup</strong> na prywatnym Dysku Google użytkownika (zgodnie z ustawieniami systemu Android i konta Google użytkownika). Deweloper nie ma dostępu do tej kopii zapasowej.
+        </p>
+
+        <h2>2. Zewnętrzne źródła tekstów biblijnych i logowanie</h2>
+        <p>
+            Aplikacja pobiera teksty Pisma Świętego za pośrednictwem bezpiecznego protokołu HTTPS bezpośrednio z publicznych lub autoryzowanych przez użytkownika źródeł zewnętrznych:
+        </p>
+        <ul>
+            <li><code>biblia.deon.pl</code> (Biblia Tysiąclecia),</li>
+            <li><code>pismoswiete.pl</code> (Edycja Świętego Pawła).</li>
+        </ul>
+        <p>
+            Opcjonalne logowanie do konta <code>pismoswiete.pl</code> odbywa się bezpośrednio na stronie tego serwisu wewnątrz wbudowanego widoku przeglądarki (WebView). Aplikacja <strong>nie odczytuje, nie gromadzi ani nie przesyła</strong> haseł logowania użytkownika na zewnętrzne serwery dewelopera.
+        </p>
+
+        <h2>3. Dobrowolny formularz opinii i zgłaszania błędów</h2>
+        <p>
+            Wyłącznie w przypadku, gdy użytkownik dobrowolnie wypełni i wyśle wbudowany formularz opinii lub zgłoszenia błędu, do bazy danych <strong>Google Cloud Firestore</strong> przekazywane są następujące informacje:
+        </p>
+        <ul>
+            <li>wybrana kategoria i treść wiadomości wpisana przez użytkownika,</li>
+            <li>opcjonalnie podany przez użytkownika adres e-mail (wyłącznie w celu udzielenia odpowiedzi),</li>
+            <li>podstawowe dane diagnostyczne urządzenia: wersja systemu Android i SDK, producent oraz model urządzenia, wersja Aplikacji, typ połączenia sieciowego (Wi-Fi / sieć komórkowa), gęstość ekranu oraz preferowane źródło tekstu.</li>
+        </ul>
+        <p>
+            Dane te są wykorzystywane wyłącznie w celu diagnozowania usterek technicznych, ulepszania Aplikacji oraz kontaktu zwrotnego z użytkownikiem.
+        </p>
+
+        <h2>4. Uprawnienia systemu Android</h2>
+        <ul>
+            <li><strong>Dostęp do internetu i stanu sieci</strong> (<code>INTERNET</code>, <code>ACCESS_NETWORK_STATE</code>) — wyłącznie w celu pobierania fragmentów biblijnych oraz wysyłki dobrowolnego formularza opinii.</li>
+            <li><strong>Powiadomienia</strong> (<code>POST_NOTIFICATIONS</code>, opcjonalne) — wyłącznie w celu wyświetlania lokalnych, codziennych przypomnień o czytaniu Pisma Świętego według pory ustawionej przez użytkownika.</li>
+            <li><strong>Syntezator mowy (TTS)</strong> — do odczytywania tekstu na głos lokalnie na urządzeniu.</li>
+        </ul>
+
+        <h2>5. Reklamy, śledzenie i udostępnianie danych</h2>
+        <p>
+            Aplikacja <strong>nie wyświetla reklam</strong>, nie korzysta z zewnętrznych sieci reklamowych ani nie sprzedaje żadnych danych osobowych podmiotom trzecim.
+        </p>
+
+        <h2>6. Usuwanie danych i prawa użytkownika</h2>
+        <p>
+            Lokalne dane Aplikacji można w każdej chwili całkowicie usunąć poprzez wyczyszczenie danych aplikacji w ustawieniach systemu Android lub odinstalowanie Aplikacji.
+            W sprawach dotyczących usunięcia dobrowolnie wysłanych zgłoszeń (opinii / adresu e-mail) lub w razie pytań dotyczących prywatności prosimy o kontakt:
+        </p>
+
+        <div class="contact-box">
+            <strong>Kontakt w sprawach prywatności (Data Privacy Contact):</strong><br />
+            E-mail: <a href="mailto:lukaszp1985@gmail.com">lukaszp1985@gmail.com</a>
+        </div>
+
+        <hr class="lang-divider" />
+
+        <section lang="en">
+            <h2>Privacy Policy Summary (English)</h2>
+            <p class="meta">Effective Date: November 21, 2026 &bull; App: Manna 365 (<code>com.aistudio.slowonadzien.fzypnt</code>)</p>
+            <ul>
+                <li><strong>Local Data &amp; Backup:</strong> Reading progress, bookmarks/favorites, reading streaks, and preferences are stored locally on the user's device and may be backed up via Android Auto Backup to the user's own Google Drive account.</li>
+                <li><strong>Scripture Sources:</strong> Text is fetched over HTTPS from <code>biblia.deon.pl</code> and <code>pismoswiete.pl</code>. Optional login to <code>pismoswiete.pl</code> occurs directly on the third-party site inside WebView; the app never collects or stores user passwords.</li>
+                <li><strong>Voluntary Feedback:</strong> Only when the user explicitly submits the in-app feedback form are the message, optional contact email, and basic device diagnostics (OS version, device model, app version, network type) sent to Google Cloud Firestore for troubleshooting and support.</li>
+                <li><strong>No Ads &amp; No Data Sales:</strong> The app displays no advertisements, performs no cross-app tracking, and never sells user data. Notifications are strictly local reading reminders.</li>
+                <li><strong>Contact &amp; Deletion Requests:</strong> Users can delete local data by clearing app storage or uninstalling, and request deletion of submitted feedback by emailing <a href="mailto:lukaszp1985@gmail.com">lukaszp1985@gmail.com</a>.</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer>
+        &copy; 2026 Manna 365
+    </footer>
+</body>
+</html>

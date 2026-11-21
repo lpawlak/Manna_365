@@ -13,13 +13,9 @@
                 android:endX="108"
                 android:endY="108"
                 android:type="linear">
-                <item android:offset="0.0" android:color="#4E342E" />
-                <item android:offset="1.0" android:color="#21100B" />
+                <item android:offset="0.0" android:color="#FFFDF8" />
+                <item android:offset="1.0" android:color="#F5E7D3" />
             </gradient>
         </aapt:attr>
     </path>
-    <!-- Subtle circular aura / halo behind Bible -->
-    <path
-        android:fillColor="#15FFE082"
-        android:pathData="M54,54m-38,0a38,38 0 1,1 76,0a38,38 0 1,1 -76,0" />
 </vector>

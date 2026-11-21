@@ -4,6 +4,4 @@
     <include domain="database" path="."/>
     <!-- Kopia zapasowa preferencji użytkownika, motywu i ulubionych -->
     <include domain="sharedpref" path="."/>
-    <!-- Wykluczenie tymczasowej pamięci podręcznej tekstów biblijnych -->
-    <exclude domain="root" path="cache/"/>
 </full-backup-content>

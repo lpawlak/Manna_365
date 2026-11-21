@@ -94,11 +94,15 @@
             text-decoration: underline;
         }
         .contact-box {
-            margin-top: 28px;
+            margin-top: 24px;
             padding: 16px 18px;
             border-radius: 12px;
             background: var(--accent-soft);
             border: 1px solid var(--border);
+        }
+        .contact-box p {
+            margin: 6px 0 0;
+            font-size: 0.96rem;
         }
         hr.lang-divider {
             border: none;
@@ -131,8 +135,7 @@
 
         <p>
             Niniejsza Polityka Prywatności wyjaśnia, jakie dane są przetwarzane podczas korzystania z aplikacji mobilnej
-            <strong>Manna 365</strong> (zwanej dalej „Aplikacją”). Twórcą i administratorem Aplikacji jest
-            Łukasz (kontakt: <a href="mailto:lukaszp1985@gmail.com">lukaszp1985@gmail.com</a>).
+            <strong>Manna 365</strong> (zwanej dalej „Aplikacją”) udostępnianej przez wydawcę Aplikacji.
         </p>
 
         <h2>1. Dane przechowywane lokalnie na urządzeniu i kopia zapasowa</h2>
@@ -145,7 +148,7 @@
             <li>ustawienia Aplikacji (wybrany plan, źródło tekstu, motyw kolorystyczny, rozmiar czcionki, godzina przypomnienia).</li>
         </ul>
         <p>
-            Dane te mogą być automatycznie archiwizowane przez systemową funkcję <strong>Android Auto Backup</strong> na prywatnym Dysku Google użytkownika (zgodnie z ustawieniami systemu Android i konta Google użytkownika). Deweloper nie ma dostępu do tej kopii zapasowej.
+            Dane te mogą być automatycznie archiwizowane przez systemową funkcję <strong>Android Auto Backup</strong> na prywatnym Dysku Google użytkownika (zgodnie z ustawieniami systemu Android i konta Google użytkownika). Wydawca nie ma dostępu do tej kopii zapasowej.
         </p>
 
         <h2>2. Zewnętrzne źródła tekstów biblijnych i logowanie</h2>
@@ -157,12 +160,12 @@
             <li><code>pismoswiete.pl</code> (Edycja Świętego Pawła).</li>
         </ul>
         <p>
-            Opcjonalne logowanie do konta <code>pismoswiete.pl</code> odbywa się bezpośrednio na stronie tego serwisu wewnątrz wbudowanego widoku przeglądarki (WebView). Aplikacja <strong>nie odczytuje, nie gromadzi ani nie przesyła</strong> haseł logowania użytkownika na zewnętrzne serwery dewelopera.
+            Opcjonalne logowanie do konta <code>pismoswiete.pl</code> odbywa się bezpośrednio na stronie tego serwisu wewnątrz wbudowanego widoku przeglądarki (WebView). Aplikacja <strong>nie odczytuje, nie gromadzi ani nie przesyła</strong> haseł logowania użytkownika na zewnętrzne serwery wydawcy.
         </p>
 
-        <h2>3. Dobrowolny formularz opinii i zgłaszania błędów</h2>
+        <h2>3. Dobrowolny formularz kontaktowy i zgłaszania błędów</h2>
         <p>
-            Wyłącznie w przypadku, gdy użytkownik dobrowolnie wypełni i wyśle wbudowany formularz opinii lub zgłoszenia błędu, do bazy danych <strong>Google Cloud Firestore</strong> przekazywane są następujące informacje:
+            Wyłącznie w przypadku, gdy użytkownik dobrowolnie wypełni i wyśle wbudowany formularz kontaktowy w Aplikacji, do bazy danych <strong>Google Cloud Firestore</strong> przekazywane są następujące informacje:
         </p>
         <ul>
             <li>wybrana kategoria i treść wiadomości wpisana przez użytkownika,</li>
@@ -175,7 +178,7 @@
 
         <h2>4. Uprawnienia systemu Android</h2>
         <ul>
-            <li><strong>Dostęp do internetu i stanu sieci</strong> (<code>INTERNET</code>, <code>ACCESS_NETWORK_STATE</code>) — wyłącznie w celu pobierania fragmentów biblijnych oraz wysyłki dobrowolnego formularza opinii.</li>
+            <li><strong>Dostęp do internetu i stanu sieci</strong> (<code>INTERNET</code>, <code>ACCESS_NETWORK_STATE</code>) — wyłącznie w celu pobierania fragmentów biblijnych oraz wysyłki dobrowolnego formularza kontaktowego.</li>
             <li><strong>Powiadomienia</strong> (<code>POST_NOTIFICATIONS</code>, opcjonalne) — wyłącznie w celu wyświetlania lokalnych, codziennych przypomnień o czytaniu Pisma Świętego według pory ustawionej przez użytkownika.</li>
             <li><strong>Syntezator mowy (TTS)</strong> — do odczytywania tekstu na głos lokalnie na urządzeniu.</li>
         </ul>
@@ -185,15 +188,18 @@
             Aplikacja <strong>nie wyświetla reklam</strong>, nie korzysta z zewnętrznych sieci reklamowych ani nie sprzedaje żadnych danych osobowych podmiotom trzecim.
         </p>
 
-        <h2>6. Usuwanie danych i prawa użytkownika</h2>
+        <h2>6. Usuwanie danych i kontakt z wydawcą</h2>
         <p>
             Lokalne dane Aplikacji można w każdej chwili całkowicie usunąć poprzez wyczyszczenie danych aplikacji w ustawieniach systemu Android lub odinstalowanie Aplikacji.
-            W sprawach dotyczących usunięcia dobrowolnie wysłanych zgłoszeń (opinii / adresu e-mail) lub w razie pytań dotyczących prywatności prosimy o kontakt:
         </p>
 
         <div class="contact-box">
-            <strong>Kontakt w sprawach prywatności (Data Privacy Contact):</strong><br />
-            E-mail: <a href="mailto:lukaszp1985@gmail.com">lukaszp1985@gmail.com</a>
+            <strong>Kontakt w sprawach prywatności i usuwania zgłoszeń:</strong>
+            <p>
+                Z wydawcą można skontaktować się za pomocą wbudowanego formularza w aplikacji
+                <strong>Manna 365</strong> (<em>Ustawienia &rarr; Kontakt z autorem i pomoc &rarr; Otwórz formularz kontaktowy</em>)
+                lub poprzez dedykowany adres kontaktowy wydawcy podany na karcie aplikacji w sklepie Google Play.
+            </p>
         </div>
 
         <hr class="lang-divider" />
@@ -204,9 +210,9 @@
             <ul>
                 <li><strong>Local Data &amp; Backup:</strong> Reading progress, bookmarks/favorites, reading streaks, and preferences are stored locally on the user's device and may be backed up via Android Auto Backup to the user's own Google Drive account.</li>
                 <li><strong>Scripture Sources:</strong> Text is fetched over HTTPS from <code>biblia.deon.pl</code> and <code>pismoswiete.pl</code>. Optional login to <code>pismoswiete.pl</code> occurs directly on the third-party site inside WebView; the app never collects or stores user passwords.</li>
-                <li><strong>Voluntary Feedback:</strong> Only when the user explicitly submits the in-app feedback form are the message, optional contact email, and basic device diagnostics (OS version, device model, app version, network type) sent to Google Cloud Firestore for troubleshooting and support.</li>
+                <li><strong>Voluntary Feedback:</strong> Only when the user explicitly submits the in-app contact form are the message, optional contact email, and basic device diagnostics (OS version, device model, app version, network type) sent to Google Cloud Firestore for troubleshooting and support.</li>
                 <li><strong>No Ads &amp; No Data Sales:</strong> The app displays no advertisements, performs no cross-app tracking, and never sells user data. Notifications are strictly local reading reminders.</li>
-                <li><strong>Contact &amp; Deletion Requests:</strong> Users can delete local data by clearing app storage or uninstalling, and request deletion of submitted feedback by emailing <a href="mailto:lukaszp1985@gmail.com">lukaszp1985@gmail.com</a>.</li>
+                <li><strong>Contact &amp; Deletion Requests:</strong> Users can delete local data by clearing app storage or uninstalling, and contact the developer via the built-in in-app contact form (<em>Settings &rarr; Kontakt z autorem i pomoc</em>) or via the developer contact listed on the Google Play store page.</li>
             </ul>
         </section>
     </main>
